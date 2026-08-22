@@ -1,0 +1,6 @@
+{
+  "name": "Quản lý Lớp 11B6 - Vườn Ươm Tri Thức",
+  "description": "Hệ thống quản trị và thi đua lớp chủ nhiệm 11B6: theo dõi rèn luyện, điểm cộng trừ, thi đua tổ, thời khóa biểu báo bài, lịch trực nhật và cổng phụ huynh.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

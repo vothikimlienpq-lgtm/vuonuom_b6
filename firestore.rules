@@ -1,0 +1,127 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isGVCN() {
+      return isAuthenticated() && request.auth.token.email == 'vothikimlien.pq@gmail.com';
+    }
+
+    function userRecord(classId) {
+      return get(/databases/$(database)/documents/classes/$(classId)/authorizedUsers/$(request.auth.uid));
+    }
+
+    function isBCS(classId) {
+      return isAuthenticated()
+        && exists(/databases/$(database)/documents/classes/$(classId)/authorizedUsers/$(request.auth.uid))
+        && userRecord(classId).data.role == 'bcs';
+    }
+
+    function canManageClassWork(classId) {
+      return isGVCN() || isBCS(classId);
+    }
+
+    // Root class documents
+    match /classes/{classId} {
+      allow read: if true;
+      allow create, update, delete: if isGVCN();
+
+      // 1. Public student roster (Contains ONLY basic public info: id, orderNumber, fullName, gender, groupNumber, position)
+      match /students/{studentId} {
+        allow read: if true;
+        allow write: if isGVCN();
+      }
+
+      // 2. Private student contact details & parent codes (Strictly GVCN only)
+      match /privateStudentData/{studentId} {
+        allow read, write: if isGVCN();
+      }
+
+      // 3. Point Rules (Standard rules)
+      match /pointRules/{ruleId} {
+        allow read: if true;
+        allow write: if isGVCN();
+      }
+
+      // 4. Point Transactions (Strictly authenticated & authorized users: GVCN or authorized BCS. No public read)
+      match /transactions/{transactionId} {
+        allow read: if canManageClassWork(classId);
+        allow create, update: if canManageClassWork(classId);
+        allow delete: if isGVCN();
+      }
+
+      // 5. Day & Week Locks
+      match /dayLocks/{lockId} {
+        allow read: if true;
+        allow write: if canManageClassWork(classId);
+      }
+
+      match /weekLocks/{lockId} {
+        allow read: if true;
+        allow write: if isGVCN();
+      }
+
+      // 6. Group Bonuses
+      match /groupBonuses/{bonusId} {
+        allow read: if true;
+        allow write: if isGVCN();
+      }
+
+      // 7. School Rankings
+      match /schoolRankings/{rankingId} {
+        allow read: if true;
+        allow write: if isGVCN();
+      }
+
+      // 8. Timetable & Homework
+      match /timetable/{entryId} {
+        allow read: if true;
+        allow write: if canManageClassWork(classId);
+      }
+
+      match /homeworkTasks/{taskId} {
+        allow read: if true;
+        allow write: if canManageClassWork(classId);
+      }
+
+      // 9. Cleaning Duties & Assignments
+      match /cleaningDuties/{dutyId} {
+        allow read: if true;
+        allow write: if canManageClassWork(classId);
+      }
+
+      match /cleaningAssignments/{assignmentId} {
+        allow read: if true;
+        allow write: if canManageClassWork(classId);
+      }
+
+      // 10. Reminders
+      match /reminders/{reminderId} {
+        allow read: if true;
+        allow write: if canManageClassWork(classId);
+      }
+
+      // 11. Audit Logs (Immutable, only authorized users can append, only GVCN can read)
+      match /auditLogs/{logId} {
+        allow read: if isGVCN();
+        allow create: if canManageClassWork(classId);
+        allow update, delete: if false;
+      }
+
+      // 12. Authorized Users (Role & Permission Grants managed by GVCN)
+      match /authorizedUsers/{userId} {
+        allow read: if isGVCN() || (isAuthenticated() && request.auth.uid == userId);
+        allow write: if isGVCN();
+      }
+    }
+
+    // Default deny all other paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

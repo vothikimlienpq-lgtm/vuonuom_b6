@@ -1,0 +1,171 @@
+{
+  "entities": {
+    "ClassConfig": {
+      "title": "ClassConfig",
+      "description": "Cấu hình chung của lớp học và kế hoạch thời gian",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "className": { "type": "string" },
+        "schoolName": { "type": "string" },
+        "academicYear": { "type": "string" },
+        "teacherName": { "type": "string" },
+        "themeTitle": { "type": "string" },
+        "slogan": { "type": "string" },
+        "week1StartDate": { "type": "string" },
+        "totalWeeks": { "type": "number" },
+        "activeMonth": { "type": "number" },
+        "activeWeek": { "type": "number" },
+        "periodsPerDay": { "type": "number" },
+        "morningPeriods": { "type": "number" },
+        "afternoonPeriods": { "type": "number" },
+        "scheduleStructure": { "type": "string" },
+        "subjects": { "type": "array" },
+        "cleaningTasks": { "type": "array" },
+        "bcsPin": { "type": "string" },
+        "studentPin": { "type": "string" }
+      },
+      "required": ["className", "schoolName", "academicYear", "teacherName", "week1StartDate", "totalWeeks"]
+    },
+    "Student": {
+      "title": "PublicStudent",
+      "description": "Thông tin học sinh công khai trong danh sách lớp",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orderNumber": { "type": "number" },
+        "fullName": { "type": "string", "maxLength": 100 },
+        "gender": { "type": "string", "enum": ["Nam", "Nữ"] },
+        "groupNumber": { "type": "number" },
+        "position": { "type": "string" }
+      },
+      "required": ["orderNumber", "fullName", "groupNumber"]
+    },
+    "PrivateStudentData": {
+      "title": "PrivateStudentData",
+      "description": "Dữ liệu liên hệ và mã phụ huynh bảo mật (chỉ GVCN truy cập)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "phone": { "type": "string", "maxLength": 20 },
+        "parentName": { "type": "string", "maxLength": 100 },
+        "parentPhone": { "type": "string", "maxLength": 20 },
+        "parentCode": { "type": "string", "maxLength": 30 },
+        "notes": { "type": "string", "maxLength": 500 },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "parentCode"]
+    },
+    "PointRule": {
+      "title": "PointRule",
+      "description": "Quy chế điểm cộng và điểm trừ",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string", "enum": ["plus", "minus"] },
+        "content": { "type": "string", "maxLength": 200 },
+        "defaultPoints": { "type": "number" },
+        "isFlexiblePoints": { "type": "boolean" },
+        "requiresSubjectAndExamType": { "type": "boolean" },
+        "requiresReason": { "type": "boolean" },
+        "category": { "type": "string" },
+        "isActive": { "type": "boolean" }
+      },
+      "required": ["type", "content", "defaultPoints", "category", "isActive"]
+    },
+    "PointTransaction": {
+      "title": "PointTransaction",
+      "description": "Giao dịch ghi nhận điểm cộng trừ rèn luyện",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "groupNumber": { "type": "number" },
+        "month": { "type": "number" },
+        "week": { "type": "number" },
+        "dayOfWeek": { "type": "string" },
+        "ruleId": { "type": "string" },
+        "ruleContent": { "type": "string" },
+        "type": { "type": "string", "enum": ["plus", "minus"] },
+        "points": { "type": "number" },
+        "quantity": { "type": "number" },
+        "totalPoints": { "type": "number" },
+        "subject": { "type": "string" },
+        "examType": { "type": "string" },
+        "reason": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "creatorRole": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "isLocked": { "type": "boolean" }
+      },
+      "required": ["studentId", "month", "week", "dayOfWeek", "ruleId", "type", "points", "totalPoints", "createdBy", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/classes/{classId}": {
+      "schema": "ClassConfig",
+      "description": "Tài liệu cấu hình gốc của lớp"
+    },
+    "/classes/{classId}/students/{studentId}": {
+      "schema": "Student",
+      "description": "Danh sách học sinh công khai của lớp"
+    },
+    "/classes/{classId}/privateStudentData/{studentId}": {
+      "schema": "PrivateStudentData",
+      "description": "Thông tin liên lạc và mã phụ huynh bảo mật (chỉ GVCN)"
+    },
+    "/classes/{classId}/pointRules/{ruleId}": {
+      "schema": "PointRule",
+      "description": "Quy chế điểm rèn luyện của lớp"
+    },
+    "/classes/{classId}/transactions/{transactionId}": {
+      "schema": "PointTransaction",
+      "description": "Lịch sử điểm rèn luyện của học sinh"
+    },
+    "/classes/{classId}/dayLocks/{dayLockId}": {
+      "schema": "object",
+      "description": "Trạng thái khóa ngày"
+    },
+    "/classes/{classId}/weekLocks/{weekLockId}": {
+      "schema": "object",
+      "description": "Trạng thái khóa tuần"
+    },
+    "/classes/{classId}/groupBonuses/{bonusId}": {
+      "schema": "object",
+      "description": "Điểm thưởng thi đua tổ"
+    },
+    "/classes/{classId}/schoolRankings/{rankingId}": {
+      "schema": "object",
+      "description": "Bảng xếp hạng tuần của trường"
+    },
+    "/classes/{classId}/timetable/{entryId}": {
+      "schema": "object",
+      "description": "Thời khóa biểu các tiết học"
+    },
+    "/classes/{classId}/homeworkTasks/{taskId}": {
+      "schema": "object",
+      "description": "Nhiệm vụ bài tập về nhà"
+    },
+    "/classes/{classId}/cleaningDuties/{dutyId}": {
+      "schema": "object",
+      "description": "Nhiệm vụ trực nhật lớp"
+    },
+    "/classes/{classId}/reminders/{reminderId}": {
+      "schema": "object",
+      "description": "Lời nhắc nhở theo tuần"
+    },
+    "/classes/{classId}/cleaningAssignments/{assignmentId}": {
+      "schema": "object",
+      "description": "Phân công trực nhật chi tiết"
+    },
+    "/classes/{classId}/auditLogs/{logId}": {
+      "schema": "object",
+      "description": "Nhật ký hệ thống"
+    },
+    "/classes/{classId}/authorizedUsers/{userId}": {
+      "schema": "object",
+      "description": "Danh sách tài khoản được ủy quyền"
+    }
+  }
+}
