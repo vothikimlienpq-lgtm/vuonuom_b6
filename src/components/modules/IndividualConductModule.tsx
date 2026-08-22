@@ -350,7 +350,7 @@ export const IndividualConductModule: React.FC<IndividualConductModuleProps> = (
   }
 
   // -------------------------------------------------------------
-  // STANDARD VIEW (GVCN, BCS, GUEST): 40 Students Roster & Scoring
+  // STANDARD VIEW (GVCN, BCS, GUEST): Dynamic student roster & scoring
   // -------------------------------------------------------------
 
   // Filter and sort for standard view
@@ -400,7 +400,7 @@ export const IndividualConductModule: React.FC<IndividualConductModuleProps> = (
       <div className="bg-gradient-to-r from-[#064e3b] via-[#095c47] to-[#043d2e] rounded-[28px] p-6 sm:p-8 text-white shadow-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <span className="px-3 py-1 rounded-full text-xs font-black bg-amber-400 text-emerald-950 uppercase tracking-wider">
-            Đánh Giá Toàn Diện 40 Học Sinh
+            Đánh Giá Toàn Diện {students.length} Học Sinh
           </span>
           <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white mt-1.5 flex items-center gap-2">
             <Users className="w-7 h-7 text-amber-400" />
@@ -418,7 +418,7 @@ export const IndividualConductModule: React.FC<IndividualConductModuleProps> = (
             className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-emerald-950 font-bold text-xs sm:text-sm shadow-md transition active:scale-95 cursor-pointer shrink-0"
           >
             <Printer className="w-4 h-4 text-emerald-950" />
-            <span>In phiếu 40 học sinh (A4)</span>
+            <span>In phiếu {students.length} học sinh (A4)</span>
           </button>
         </div>
       </div>
@@ -498,7 +498,7 @@ export const IndividualConductModule: React.FC<IndividualConductModuleProps> = (
           </div>
         </div>
 
-        {/* 40 Students Matrix Table */}
+        {/* Dynamic students matrix table */}
         <div className="overflow-x-auto rounded-2xl border border-slate-200">
           <table className="w-full text-left text-xs">
             <thead className="bg-[#064e3b] text-white uppercase text-[11px] tracking-wider">
