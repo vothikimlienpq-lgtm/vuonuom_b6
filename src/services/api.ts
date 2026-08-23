@@ -262,9 +262,9 @@ export const api = {
       }
       let msg = 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.';
       if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-        msg = 'Mật khẩu không chính xác.';
+        msg = 'Tên đăng nhập hoặc mật khẩu không chính xác.';
       } else if (err.code === 'auth/user-not-found') {
-        msg = `Tài khoản ${cleanEmail} chưa tồn tại trên Firebase Authentication. Vui lòng đăng ký trên Firebase Console.`;
+        msg = 'Tên đăng nhập chưa tồn tại hoặc chưa được kích hoạt.';
       } else if (err.code === 'auth/too-many-requests') {
         msg = 'Nhập sai quá nhiều lần. Thiết bị tạm khóa để bảo vệ an toàn.';
       } else if (err.message) {
@@ -754,6 +754,26 @@ export const api = {
     reason?: string;
   }): Promise<{ success: boolean; transaction: PointTransaction; message: string }> => {
     try {
+      const studentId = String(payload.studentId || '').trim();
+      let studentName = String(payload.studentName || '').trim();
+
+      if (!studentId) {
+        throw new Error('Vui lòng chọn học sinh trước khi ghi nhận điểm.');
+      }
+
+      // Phòng trường hợp giao diện cũ chưa truyền studentName: đọc lại hồ sơ
+      // học sinh từ đúng lớp đang hoạt động trước khi ghi giao dịch.
+      if (!studentName) {
+        const studentSnapshot = await getDoc(doc(studentsColRef, studentId));
+        if (studentSnapshot.exists()) {
+          studentName = String(studentSnapshot.data().fullName || '').trim();
+        }
+      }
+
+      if (!studentName) {
+        throw new Error('Không tìm thấy tên học sinh. Vui lòng tải lại danh sách lớp rồi thử lại.');
+      }
+
       const qty = payload.quantity || 1;
       const totalPts = payload.points * qty;
       const txId = `TX_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
@@ -761,8 +781,8 @@ export const api = {
       const currentSession = await api.getCurrentSession();
       const newTx: PointTransaction = {
         id: txId,
-        studentId: payload.studentId,
-        studentName: payload.studentName,
+        studentId,
+        studentName,
         groupNumber: payload.groupNumber,
         month: payload.month,
         week: payload.week,
@@ -773,20 +793,23 @@ export const api = {
         points: payload.points,
         quantity: qty,
         totalPoints: totalPts,
-        subject: payload.subject,
-        examType: payload.examType,
-        reason: payload.reason,
         createdBy: currentSession.username,
         creatorRole: currentSession.role === 'gvcn' ? 'gvcn' : 'bcs',
         createdAt: new Date().toISOString(),
       };
+
+      // Firestore không chấp nhận giá trị undefined. Chỉ thêm các trường tùy
+      // chọn khi chúng thực sự có nội dung.
+      if (payload.subject) newTx.subject = payload.subject;
+      if (payload.examType) newTx.examType = payload.examType;
+      if (payload.reason) newTx.reason = payload.reason;
 
       await setDoc(doc(transactionsColRef, txId), newTx);
 
       return {
         success: true,
         transaction: newTx,
-        message: `Đã ghi nhận ${payload.type === 'plus' ? 'điểm cộng' : 'điểm trừ'} cho học sinh ${payload.studentName}.`,
+        message: `Đã ghi nhận ${payload.type === 'plus' ? 'điểm cộng' : 'điểm trừ'} cho học sinh ${studentName}.`,
       };
     } catch (err) {
       handleFirestoreError(err, OperationType.CREATE, 'transactions');
