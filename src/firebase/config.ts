@@ -2,9 +2,6 @@ import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
 import { getFirestore, Firestore, doc, getDocFromServer } from 'firebase/firestore';
 
-export const CLASS_ID = '11b6-2026-2027';
-export const TEACHER_EMAIL = 'vothikimlien.pq@gmail.com';
-
 // Firebase configuration schema
 export interface CustomFirebaseConfig {
   apiKey: string;
@@ -65,10 +62,11 @@ export const auth: Auth = getAuth(app);
 export const db: Firestore = getFirestore(app);
 
 // Test connection on boot
-export async function testFirestoreConnection(): Promise<boolean> {
+export async function testFirestoreConnection(classId?: string): Promise<boolean> {
   if (!isFirebaseConfigured()) return false;
+  if (!classId) return true;
   try {
-    await getDocFromServer(doc(db, 'classes', CLASS_ID));
+    await getDocFromServer(doc(db, 'classes', classId));
     return true;
   } catch (error) {
     if (error instanceof Error && error.message.includes('the client is offline')) {

@@ -11,10 +11,9 @@ import {
   Mail,
   Eye,
   EyeOff,
+  School,
 } from 'lucide-react';
-import { UserRole } from '../types';
 import { api } from '../services/api';
-import { TEACHER_EMAIL } from '../firebase/config';
 import { useToast } from './Toast';
 
 interface LoginModalProps {
@@ -29,8 +28,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   onLoginSuccess,
 }) => {
   const { success, error } = useToast();
-  const [selectedRole, setSelectedRole] = useState<UserRole>('gvcn');
-  const [email, setEmail] = useState(TEACHER_EMAIL);
+  const [classId, setClassId] = useState(localStorage.getItem('activeClassId') || '11b6-2026-2027');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -46,7 +45,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
     try {
       const res = await api.login({
-        email: selectedRole === 'gvcn' ? (email || TEACHER_EMAIL) : email,
+        classId,
+        email,
         password,
       });
 
@@ -87,46 +87,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             <Lock className="w-7 h-7 text-[#064e3b]" />
           </div>
           <h2 className="text-2xl font-black text-[#064e3b] tracking-tight">
-            Đăng Nhập Hệ Thống Lớp 11B6
+            Đăng Nhập Không Gian Lớp
           </h2>
           <p className="text-xs sm:text-sm text-slate-600 mt-1">
             Xác thực an toàn qua Firebase Authentication để quản lý dữ liệu lớp học
           </p>
-        </div>
-
-        {/* Role Selection Tabs */}
-        <div className="grid grid-cols-2 gap-2 mb-6">
-          {[
-            { id: 'gvcn' as UserRole, label: 'Giáo Viên Chủ Nhiệm', icon: Sparkles, desc: 'Toàn quyền quản trị & chốt sổ' },
-            { id: 'bcs' as UserRole, label: 'Ban Cán Sự / Quản lý', icon: ShieldCheck, desc: 'Ghi nhận điểm thi đua & báo bài' },
-          ].map(tab => {
-            const Icon = tab.icon;
-            const isSelected = selectedRole === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => {
-                  setSelectedRole(tab.id);
-                  if (tab.id === 'gvcn') {
-                    setEmail(TEACHER_EMAIL);
-                  } else {
-                    setEmail('');
-                  }
-                  setErrorMsg('');
-                }}
-                className={`flex flex-col items-center justify-center p-3 rounded-2xl border text-xs font-bold transition-all duration-200 cursor-pointer ${
-                  isSelected
-                    ? 'bg-[#064e3b] text-amber-300 border-[#064e3b] shadow-md scale-102'
-                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                }`}
-              >
-                <Icon className={`w-5 h-5 mb-1.5 ${isSelected ? 'text-amber-300' : 'text-slate-500'}`} />
-                <span className="font-black">{tab.label}</span>
-                <span className="text-[10px] font-normal opacity-80 mt-0.5 text-center">{tab.desc}</span>
-              </button>
-            );
-          })}
         </div>
 
         {/* Lockout Warning if any */}
@@ -146,14 +111,27 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
         {/* Input Form */}
         <form onSubmit={handleLogin} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+              Class ID
+            </label>
+            <div className="relative">
+              <School className="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={classId}
+                onChange={(e) => setClassId(e.target.value.toLowerCase().replace(/\s+/g, ''))}
+                placeholder="Ví dụ: 11b6-2026-2027"
+                required
+                className="w-full pl-11 pr-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-slate-900 font-bold text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#064e3b] transition"
+              />
+            </div>
+          </div>
           
           {/* Email input */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider flex items-center justify-between">
-              <span>{selectedRole === 'gvcn' ? 'Email GVCN (Firebase Auth)' : 'Email Tài Khoản Phân Quyền'}</span>
-              {selectedRole === 'gvcn' && (
-                <span className="text-[10px] text-amber-700 font-extrabold lowercase font-mono">{TEACHER_EMAIL}</span>
-              )}
+              <span>Email tài khoản Firebase</span>
             </label>
             <div className="relative">
               <Mail className="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -161,7 +139,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder={selectedRole === 'gvcn' ? TEACHER_EMAIL : 'email.bcs@domain.com'}
+                placeholder="tennguoidung@gmail.com"
                 required
                 className="w-full pl-11 pr-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-slate-900 font-bold text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#064e3b] transition"
               />
@@ -208,7 +186,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
         {/* Public View note */}
         <div className="mt-6 pt-4 border-t border-slate-100 text-center">
           <p className="text-xs text-slate-500">
-            Học sinh và phụ huynh có thể tra cứu kết quả thi đua, nề nếp, thời khóa biểu và báo bài trực tiếp mà không cần tài khoản quản trị.
+            Vai trò được hệ thống đọc từ danh sách thành viên của đúng Class ID. Không thể tự chọn quyền giáo viên, ban cán sự hoặc phụ huynh.
           </p>
         </div>
 

@@ -10,6 +10,7 @@ import {
   writeBatch,
   query,
   orderBy,
+  where,
   Unsubscribe,
 } from 'firebase/firestore';
 import {
@@ -22,8 +23,6 @@ import {
 import {
   db,
   auth,
-  CLASS_ID,
-  TEACHER_EMAIL,
   isFirebaseConfigured,
   handleFirestoreError,
   OperationType,
@@ -50,29 +49,92 @@ import {
   WeekLock,
 } from '../types';
 
-// Root class document reference
-const classDocRef = doc(db, 'classes', CLASS_ID);
+const EMPTY_CLASS_ID = '__no_class_selected__';
+let activeClassId = localStorage.getItem('activeClassId') || EMPTY_CLASS_ID;
+
+// Các tham chiếu được tạo lại mỗi khi người dùng chọn một lớp khác.
+let classDocRef = doc(db, 'classes', activeClassId);
 
 // Subcollection references
-const studentsColRef = collection(db, 'classes', CLASS_ID, 'students');
-const privateStudentColRef = collection(db, 'classes', CLASS_ID, 'privateStudentData');
-const rulesColRef = collection(db, 'classes', CLASS_ID, 'pointRules');
-const transactionsColRef = collection(db, 'classes', CLASS_ID, 'transactions');
-const dayLocksColRef = collection(db, 'classes', CLASS_ID, 'dayLocks');
-const weekLocksColRef = collection(db, 'classes', CLASS_ID, 'weekLocks');
-const groupBonusesColRef = collection(db, 'classes', CLASS_ID, 'groupBonuses');
-const schoolRankingsColRef = collection(db, 'classes', CLASS_ID, 'schoolRankings');
-const timetableColRef = collection(db, 'classes', CLASS_ID, 'timetable');
-const homeworkColRef = collection(db, 'classes', CLASS_ID, 'homeworkTasks');
-const cleaningDutiesColRef = collection(db, 'classes', CLASS_ID, 'cleaningDuties');
-const remindersColRef = collection(db, 'classes', CLASS_ID, 'reminders');
-const cleaningAssignmentsColRef = collection(db, 'classes', CLASS_ID, 'cleaningAssignments');
-const auditLogsColRef = collection(db, 'classes', CLASS_ID, 'auditLogs');
-const authorizedUsersColRef = collection(db, 'classes', CLASS_ID, 'authorizedUsers');
+let studentsColRef = collection(db, 'classes', activeClassId, 'students');
+let privateStudentColRef = collection(db, 'classes', activeClassId, 'privateStudentData');
+let rulesColRef = collection(db, 'classes', activeClassId, 'pointRules');
+let transactionsColRef = collection(db, 'classes', activeClassId, 'transactions');
+let dayLocksColRef = collection(db, 'classes', activeClassId, 'dayLocks');
+let weekLocksColRef = collection(db, 'classes', activeClassId, 'weekLocks');
+let groupBonusesColRef = collection(db, 'classes', activeClassId, 'groupBonuses');
+let schoolRankingsColRef = collection(db, 'classes', activeClassId, 'schoolRankings');
+let timetableColRef = collection(db, 'classes', activeClassId, 'timetable');
+let homeworkColRef = collection(db, 'classes', activeClassId, 'homeworkTasks');
+let cleaningDutiesColRef = collection(db, 'classes', activeClassId, 'cleaningDuties');
+let remindersColRef = collection(db, 'classes', activeClassId, 'reminders');
+let cleaningAssignmentsColRef = collection(db, 'classes', activeClassId, 'cleaningAssignments');
+let auditLogsColRef = collection(db, 'classes', activeClassId, 'auditLogs');
+let authorizedUsersColRef = collection(db, 'classes', activeClassId, 'authorizedUsers');
+
+function selectActiveClass(classId: string) {
+  const normalized = classId.trim().toLowerCase();
+  if (!normalized) throw new Error('Vui lòng nhập Class ID.');
+  activeClassId = normalized;
+  localStorage.setItem('activeClassId', normalized);
+  classDocRef = doc(db, 'classes', normalized);
+  studentsColRef = collection(db, 'classes', normalized, 'students');
+  privateStudentColRef = collection(db, 'classes', normalized, 'privateStudentData');
+  rulesColRef = collection(db, 'classes', normalized, 'pointRules');
+  transactionsColRef = collection(db, 'classes', normalized, 'transactions');
+  dayLocksColRef = collection(db, 'classes', normalized, 'dayLocks');
+  weekLocksColRef = collection(db, 'classes', normalized, 'weekLocks');
+  groupBonusesColRef = collection(db, 'classes', normalized, 'groupBonuses');
+  schoolRankingsColRef = collection(db, 'classes', normalized, 'schoolRankings');
+  timetableColRef = collection(db, 'classes', normalized, 'timetable');
+  homeworkColRef = collection(db, 'classes', normalized, 'homeworkTasks');
+  cleaningDutiesColRef = collection(db, 'classes', normalized, 'cleaningDuties');
+  remindersColRef = collection(db, 'classes', normalized, 'reminders');
+  cleaningAssignmentsColRef = collection(db, 'classes', normalized, 'cleaningAssignments');
+  auditLogsColRef = collection(db, 'classes', normalized, 'auditLogs');
+  authorizedUsersColRef = collection(db, 'classes', normalized, 'authorizedUsers');
+}
+
+function mapMemberRole(role: string): UserRole {
+  if (role === 'teacher') return 'gvcn';
+  if (role === 'bcs') return 'bcs';
+  if (role === 'parent') return 'parent';
+  if (role === 'student') return 'student';
+  return 'guest';
+}
+
+async function buildSession(user: User, classId: string): Promise<UserSession> {
+  selectActiveClass(classId);
+  const [classSnap, memberSnap] = await Promise.all([
+    getDoc(doc(db, 'classes', activeClassId)),
+    getDoc(doc(db, 'classes', activeClassId, 'members', user.uid)),
+  ]);
+
+  if (!classSnap.exists() || classSnap.data().active !== true) {
+    throw new Error('Class ID không tồn tại hoặc lớp đã ngừng hoạt động.');
+  }
+  if (!memberSnap.exists() || memberSnap.data().active !== true) {
+    throw new Error('Tài khoản này chưa được giáo viên cấp quyền vào lớp.');
+  }
+
+  const member = memberSnap.data();
+  const role = mapMemberRole(member.role);
+  if (role === 'guest') throw new Error('Vai trò thành viên không hợp lệ.');
+
+  return {
+    role,
+    uid: user.uid,
+    classId: activeClassId,
+    className: classSnap.data().name || activeClassId,
+    username: member.displayName || user.email || 'Thành viên lớp',
+    studentId: member.studentId,
+    expiresAt: Date.now() + 7 * 24 * 3600 * 1000,
+  };
+}
 
 // Default initial config
 export const DEFAULT_INITIAL_CONFIG: ClassConfig = {
-  id: CLASS_ID,
+  id: activeClassId === EMPTY_CLASS_ID ? '' : activeClassId,
   className: '11B6',
   schoolName: 'Trường THCS & THPT Lê Lợi',
   academicYear: '2026 – 2027',
@@ -169,51 +231,35 @@ export const api = {
   login: async (payload: {
     email: string;
     password?: string;
+    classId: string;
   }): Promise<{ success: boolean; session: UserSession; message: string }> => {
-    const { email, password } = payload;
-    const cleanEmail = (email || TEACHER_EMAIL).trim();
+    const { email, password, classId } = payload;
+    const cleanEmail = email.trim();
 
     if (!password) {
       throw new Error('Vui lòng nhập mật khẩu tài khoản.');
     }
+    if (!cleanEmail) throw new Error('Vui lòng nhập email.');
+    if (!classId.trim()) throw new Error('Vui lòng nhập Class ID.');
 
     try {
       const userCredential = await signInWithEmailAndPassword(auth, cleanEmail, password);
-      const isTeacher = userCredential.user.email?.toLowerCase() === TEACHER_EMAIL.toLowerCase();
-
-      let role: UserRole = 'guest';
-      let username = userCredential.user.email || 'Người dùng';
-
-      if (isTeacher) {
-        role = 'gvcn';
-        username = 'Cô Võ Thị Kim Liên (GVCN)';
-      } else {
-        // Check if user is in authorizedUsers collection
-        try {
-          const authUserDoc = await getDoc(doc(authorizedUsersColRef, userCredential.user.uid));
-          if (authUserDoc.exists()) {
-            role = 'bcs';
-            username = authUserDoc.data().displayName || `Ban Cán Sự (${userCredential.user.email})`;
-          } else {
-            role = 'student';
-          }
-        } catch {
-          role = 'student';
-        }
-      }
-
-      const session: UserSession = {
-        role,
-        username,
-        expiresAt: Date.now() + 7 * 24 * 3600 * 1000,
-      };
+      const session = await buildSession(userCredential.user, classId);
 
       return {
         success: true,
         session,
-        message: `Đăng nhập thành công (${cleanEmail}).`,
+        message: `Đã vào lớp ${session.className} với vai trò ${session.role}.`,
       };
     } catch (err: any) {
+      // Không giữ phiên Firebase nếu tài khoản không thuộc lớp đã nhập.
+      if (auth.currentUser && (
+        err.message?.includes('Class ID') ||
+        err.message?.includes('chưa được giáo viên') ||
+        err.message?.includes('Vai trò')
+      )) {
+        await signOut(auth);
+      }
       let msg = 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.';
       if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
         msg = 'Mật khẩu không chính xác.';
@@ -233,6 +279,8 @@ export const api = {
       if (auth.currentUser) {
         await signOut(auth);
       }
+      localStorage.removeItem('activeClassId');
+      activeClassId = EMPTY_CLASS_ID;
     } catch {
       // Ignore
     }
@@ -240,86 +288,41 @@ export const api = {
 
   getCurrentSession: async (): Promise<UserSession> => {
     const currentUser = auth.currentUser;
-    if (!currentUser || !currentUser.email) {
+    const storedClassId = localStorage.getItem('activeClassId');
+    if (!currentUser || !currentUser.email || !storedClassId) {
       return {
         role: 'guest',
-        username: 'Khách / Thành Viên Lớp',
+        username: 'Khách chưa đăng nhập',
         expiresAt: 0,
       };
     }
-
-    const isTeacher = currentUser.email.toLowerCase() === TEACHER_EMAIL.toLowerCase();
-    if (isTeacher) {
-      return {
-        role: 'gvcn',
-        username: 'Cô Võ Thị Kim Liên (GVCN)',
-        expiresAt: Date.now() + 7 * 24 * 3600 * 1000,
-      };
-    }
-
-    // Check authorizedUsers
     try {
-      const authUserDoc = await getDoc(doc(authorizedUsersColRef, currentUser.uid));
-      if (authUserDoc.exists()) {
-        return {
-          role: 'bcs',
-          username: authUserDoc.data().displayName || `Ban Cán Sự (${currentUser.email})`,
-          expiresAt: Date.now() + 7 * 24 * 3600 * 1000,
-        };
-      }
+      return await buildSession(currentUser, storedClassId);
     } catch {
-      // Fall through
+      return { role: 'guest', username: 'Phiên lớp không hợp lệ', expiresAt: 0 };
     }
-
-    return {
-      role: 'student',
-      username: currentUser.email,
-      expiresAt: Date.now() + 7 * 24 * 3600 * 1000,
-    };
   },
 
   onAuthStateChanged: (callback: (session: UserSession) => void): Unsubscribe => {
     return onAuthStateChanged(auth, async (user: User | null) => {
-      if (!user || !user.email) {
+      const storedClassId = localStorage.getItem('activeClassId');
+      if (!user || !user.email || !storedClassId) {
         callback({
           role: 'guest',
-          username: 'Khách / Thành Viên Lớp',
+          username: 'Khách chưa đăng nhập',
           expiresAt: 0,
         });
         return;
       }
-
-      const isTeacher = user.email.toLowerCase() === TEACHER_EMAIL.toLowerCase();
-      if (isTeacher) {
-        callback({
-          role: 'gvcn',
-          username: 'Cô Võ Thị Kim Liên (GVCN)',
-          expiresAt: Date.now() + 7 * 24 * 3600 * 1000,
-        });
-        return;
-      }
-
       try {
-        const authUserDoc = await getDoc(doc(authorizedUsersColRef, user.uid));
-        if (authUserDoc.exists()) {
-          callback({
-            role: 'bcs',
-            username: authUserDoc.data().displayName || `Ban Cán Sự (${user.email})`,
-            expiresAt: Date.now() + 7 * 24 * 3600 * 1000,
-          });
-          return;
-        }
+        callback(await buildSession(user, storedClassId));
       } catch {
-        // Fall through
+        callback({ role: 'guest', username: 'Phiên lớp không hợp lệ', expiresAt: 0 });
       }
-
-      callback({
-        role: 'student',
-        username: user.email,
-        expiresAt: Date.now() + 7 * 24 * 3600 * 1000,
-      });
     });
   },
+
+  getActiveClassId: () => activeClassId === EMPTY_CLASS_ID ? '' : activeClassId,
 
   // -------------------------------------------------------------
   // REAL-TIME FIRESTORE SUBSCRIPTIONS
@@ -345,10 +348,14 @@ export const api = {
         classDocRef,
         (snap) => {
           if (snap.exists()) {
+            const raw = snap.data();
             latestFullData.config = {
               ...DEFAULT_INITIAL_CONFIG,
-              ...snap.data(),
+              ...raw,
               id: snap.id,
+              className: raw.className || raw.name || snap.id,
+              academicYear: raw.academicYear || raw.schoolYear || '',
+              teacherName: raw.teacherName || 'Giáo viên chủ nhiệm',
             } as ClassConfig;
           } else {
             latestFullData.config = DEFAULT_INITIAL_CONFIG;
@@ -407,24 +414,29 @@ export const api = {
         authDependentUnsubscribes.length = 0;
 
         if (currentUser) {
-          const isTeacher =
-            currentUser.email?.toLowerCase() === TEACHER_EMAIL.toLowerCase() ||
-            currentUser.email?.toLowerCase() === 'vothikimlien.pq@gmail.com';
-
-          let isAuthorized = isTeacher;
-          if (!isAuthorized) {
-            try {
-              const authDoc = await getDoc(doc(authorizedUsersColRef, currentUser.uid));
-              if (authDoc.exists()) isAuthorized = true;
-            } catch {
-              isAuthorized = false;
+          let memberRole = '';
+          let linkedStudentId = '';
+          try {
+            const memberDoc = await getDoc(doc(db, 'classes', activeClassId, 'members', currentUser.uid));
+            if (memberDoc.exists() && memberDoc.data().active === true) {
+              memberRole = memberDoc.data().role || '';
+              linkedStudentId = memberDoc.data().studentId || '';
             }
+          } catch {
+            memberRole = '';
           }
 
-          if (isAuthorized) {
+          const isTeacher = memberRole === 'teacher';
+          const canManagePoints = isTeacher || memberRole === 'bcs';
+          const canReadOwnPoints = (memberRole === 'student' || memberRole === 'parent') && !!linkedStudentId;
+
+          if (canManagePoints || canReadOwnPoints) {
             // Subscribe to transactions
+            const txSource = canReadOwnPoints
+              ? query(transactionsColRef, where('studentId', '==', linkedStudentId))
+              : transactionsColRef;
             const unsubTx = onSnapshot(
-              transactionsColRef,
+              txSource,
               (snap) => {
                 latestFullData.transactions = snap.docs.map((d) => ({
                   id: d.id,
@@ -1507,12 +1519,13 @@ export const api = {
     role: 'bcs';
   }): Promise<{ success: boolean; message: string }> => {
     try {
-      await setDoc(doc(authorizedUsersColRef, payload.uid), {
+      await setDoc(doc(db, 'classes', activeClassId, 'members', payload.uid), {
         uid: payload.uid,
         email: payload.email,
         displayName: payload.displayName,
         role: payload.role,
-        grantedAt: new Date().toISOString(),
+        active: true,
+        joinedAt: new Date().toISOString(),
       });
       return { success: true, message: `Đã cấp quyền Ban Cán Sự cho tài khoản ${payload.email}.` };
     } catch (err) {
@@ -1522,7 +1535,7 @@ export const api = {
 
   removeAuthorizedUser: async (uid: string): Promise<{ success: boolean; message: string }> => {
     try {
-      await deleteDoc(doc(authorizedUsersColRef, uid));
+      await deleteDoc(doc(db, 'classes', activeClassId, 'members', uid));
       return { success: true, message: 'Đã thu hồi quyền truy cập.' };
     } catch (err) {
       handleFirestoreError(err, OperationType.DELETE, `authorizedUsers/${uid}`);

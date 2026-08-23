@@ -34,14 +34,27 @@ function MainAppContent() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
 
-  // Subscribe to real-time data & fetch initial session
+  // Chờ Firebase Auth khôi phục phiên trước khi mở listener Firestore.
   useEffect(() => {
-    // Initial session load
-    api.getCurrentSession().then(userSession => {
+    const unsubscribeAuth = api.onAuthStateChanged((userSession) => {
       setSession(userSession);
+      if (!userSession.classId) {
+        api.getFullData().then((fallbackData) => {
+          setData(fallbackData);
+          setIsLoading(false);
+        });
+      }
     });
 
-    // Real-time Firestore subscription
+    return () => {
+      if (unsubscribeAuth) unsubscribeAuth();
+    };
+  }, []);
+
+  // Chỉ đọc dữ liệu sau khi UID đã được xác nhận là thành viên của Class ID.
+  useEffect(() => {
+    if (!session?.classId) return;
+    setIsLoading(true);
     const unsubscribe = api.subscribeFullClassData((fullData) => {
       setData(fullData);
       setIsLoading(false);
@@ -57,7 +70,7 @@ function MainAppContent() {
     return () => {
       if (unsubscribe) unsubscribe();
     };
-  }, []);
+  }, [session?.classId]);
 
   const fetchData = useCallback(async (quiet = false) => {
     if (!quiet) setIsSyncing(true);
@@ -102,7 +115,7 @@ function MainAppContent() {
       await api.logout();
       setSession(null);
       success('Đã kết thúc phiên làm việc an toàn.');
-      fetchData(true);
+      window.location.reload();
     } catch (err: any) {
       error(err.message || 'Lỗi khi đăng xuất');
     }
@@ -110,7 +123,8 @@ function MainAppContent() {
 
   const handleLoginSuccess = (newSession: UserSession) => {
     setSession(newSession);
-    fetchData(true);
+    // Tải lại để toàn bộ tham chiếu Firestore chuyển sang Class ID vừa chọn.
+    window.location.reload();
   };
 
   if (isLoading || !data) {

@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import { FullClassData, ClassConfig, PointRule, Student, UserRole } from '../../types';
 import { api } from '../../services/api';
-import { TEACHER_EMAIL } from '../../firebase/config';
+import { auth } from '../../firebase/config';
 import { useToast } from '../Toast';
 
 interface ClassSettingsModuleProps {
@@ -975,7 +975,7 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
           <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-100 text-xs space-y-1.5">
             <div className="flex items-center justify-between text-slate-700">
               <span className="font-bold">Email quản trị viên (GVCN):</span>
-              <span className="font-mono font-bold text-emerald-900 bg-white px-2 py-0.5 rounded border border-emerald-200">{TEACHER_EMAIL}</span>
+              <span className="font-mono font-bold text-emerald-900 bg-white px-2 py-0.5 rounded border border-emerald-200">{auth.currentUser?.email || 'Chưa đăng nhập'}</span>
             </div>
             <div className="flex items-center justify-between text-slate-700">
               <span className="font-bold">Trạng thái phiên đăng nhập:</span>
@@ -990,7 +990,7 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
             <form onSubmit={handleUpdatePasswords} className="space-y-4 max-w-md">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Đổi mật khẩu mới cho tài khoản GVCN ({TEACHER_EMAIL}):
+                  Đổi mật khẩu mới cho tài khoản GVCN ({auth.currentUser?.email || 'tài khoản hiện tại'}):
                 </label>
                 <input
                   type="password"

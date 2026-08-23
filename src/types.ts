@@ -206,11 +206,23 @@ export interface CleaningAssignment {
 export interface UserSession {
   role: UserRole;
   username: string;
+  uid?: string;
+  classId?: string;
+  className?: string;
   studentId?: string;
   studentName?: string;
   groupNumber?: number;
   expiresAt: number; // timestamp ms
   bcsTimeRemaining?: number; // seconds
+}
+
+export interface ClassMembership {
+  classId: string;
+  className: string;
+  role: 'teacher' | 'bcs' | 'student' | 'parent';
+  displayName: string;
+  studentId?: string;
+  active: boolean;
 }
 
 export interface AuditLog {
