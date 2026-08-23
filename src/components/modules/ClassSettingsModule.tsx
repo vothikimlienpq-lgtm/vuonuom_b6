@@ -297,7 +297,7 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
 
   // Regenerate parent codes
   const handleRegenerateParentCodes = async () => {
-    if (!window.confirm('Hành động này sẽ tạo mới toàn bộ mã phụ huynh bí mật cho tất cả học sinh. Bạn có chắc muốn tiếp tục?')) return;
+    if (!window.confirm('Hành động này sẽ tạo mã tra cứu ngẫu nhiên mới, cập nhật Cổng Phụ huynh và vô hiệu hóa toàn bộ mã cũ. Bạn có chắc muốn tiếp tục?')) return;
     try {
       const res = await api.regenerateParentCodes();
       if (res.success) {
@@ -791,10 +791,10 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
               <button
                 onClick={handleRegenerateParentCodes}
                 className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition cursor-pointer"
-                title="Tạo lại toàn bộ mã phụ huynh bí mật"
+                title="Tạo mã ngẫu nhiên mới và cập nhật Cổng Phụ huynh"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
-                <span>Tạo lại mã PH</span>
+                <span>Tạo mới mã PH</span>
               </button>
             </div>
           </div>

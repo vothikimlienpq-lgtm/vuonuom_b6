@@ -1,91 +1,98 @@
-# HƯỚNG DẪN TRIỂN KHAI VƯỜN ƯƠM 11B6 LÊN GITHUB PAGES & FIREBASE
+# TRIỂN KHAI VƯỜN ƯƠM 11B6 LÊN GITHUB PAGES VÀ FIREBASE
 
-Tài liệu này hướng dẫn chi tiết từng bước xuất bản ứng dụng **Vườn Ươm 11B6 (THCS & THPT Lê Lợi - Niên khóa 2026–2027)** lên **GitHub Pages** dưới dạng **Website tĩnh (Static SPA)** hoàn toàn miễn phí, kết nối bảo mật với **Google Firebase (Authentication & Cloud Firestore)**.
+Ứng dụng là website tĩnh React + TypeScript + Vite, dùng Firebase Authentication cho thành viên và Cloud Firestore để đồng bộ dữ liệu. Mọi người dùng xác thực Class ID trước; phụ huynh dùng mã riêng ở bước 2 và không cần tài khoản Firebase.
 
----
+## 1. Tạo Firebase Web App
 
-## TỔNG QUAN KIẾN TRÚC
+1. Mở [Firebase Console](https://console.firebase.google.com/), tạo hoặc chọn dự án.
+2. Thêm Web App bằng biểu tượng `</>`.
+3. Ghi lại `apiKey`, `authDomain`, `projectId`, `storageBucket`, `messagingSenderId` và `appId`.
+4. Bật **Authentication → Sign-in method → Email/Password**.
+5. Tạo **Cloud Firestore** ở chế độ Production.
 
-> **Lưu ý:** Phiên bản này hỗ trợ đăng nhập GVCN và Ban cán sự bằng Firebase Authentication. Cổng phụ huynh tạm thời được ẩn cho đến khi có quy trình cấp tài khoản riêng và quy tắc chỉ đọc theo từng học sinh.
+## 2. Xuất bản Firestore Rules
 
-- **Frontend:** React 19, TypeScript, Tailwind CSS, Lucide Icons, Vite.
-- **Cơ sở dữ liệu:** Google Cloud Firestore (Real-time sync đa thiết bị với `onSnapshot`).
-- **Xác thực:** Firebase Authentication (Email/Password cho GVCN: `vothikimlien.pq@gmail.com` và Ban Cán Sự/Người dùng được cấp quyền trong `authorizedUsers`).
-- **Bảo mật:** Quy tắc ABAC bảo mật cấp cao (`firestore.rules`), tách biệt dữ liệu công khai và dữ liệu liên hệ riêng tư (`privateStudentData`).
-- **Lưu trữ tĩnh:** GitHub Pages (Hoàn toàn phía trình duyệt, không cần máy chủ Node.js/Express).
+1. Vào **Firestore Database → Rules**.
+2. Sao chép toàn bộ tệp `firestore.rules` của gói này.
+3. Dán vào Firebase Console và bấm **Publish**.
 
----
+Phải hoàn thành bước này trước khi tạo mã phụ huynh. Xem quy trình kiểm tra chi tiết trong `HUONG-DAN-BAO-MAT-2-LOP.md`.
 
-## BƯỚC 1: TẠO DỰ ÁN TRÊN FIREBASE CONSOLE
+## 3. Tạo tài khoản bảo vệ lớp
 
-1. Truy cập [Firebase Console](https://console.firebase.google.com/) và đăng nhập bằng tài khoản Google.
-2. Bấm **Add project** (Tạo dự án mới).
-3. Đặt tên dự án: `vuon-uom-11b6` (hoặc tên tùy thích) ➔ Bấm **Continue** ➔ Hoàn tất tạo dự án.
-4. Tại trang chủ dự án, bấm vào biểu tượng **Web (`</>`)** để thêm Web App:
-   - Đặt tên ứng dụng web: `VuonUom11B6-Web`.
-   - Bấm **Register app**.
-5. Ghi lại các giá trị cấu hình `firebaseConfig` (gồm `apiKey`, `authDomain`, `projectId`, `storageBucket`, `messagingSenderId`, `appId`).
+Trong Authentication, tạo:
 
----
+- Email: `11b6-2026-2027@lop.local`
+- Mật khẩu: mật khẩu lớp do GVCN tự đặt.
 
-## BƯỚC 2: KÍCH HOẠT FIREBASE AUTHENTICATION
+Không tạo tài liệu `members` cho tài khoản này.
 
-1. Trên menu trái của Firebase Console, chọn **Build** ➔ **Authentication** ➔ Bấm **Get started**.
-2. Chọn tab **Sign-in method** ➔ Chọn **Email/Password** ➔ Bật công tắc **Enable** ➔ Bấm **Save**.
-3. Chọn tab **Users** ➔ Bấm **Add user**:
-   - **Email:** `vothikimlien.pq@gmail.com`
-   - **Password:** Nhập mật khẩu an toàn của cô Kim Liên (ít nhất 6 ký tự).
-   - Bấm **Add user**.
+## 4. Tạo tài khoản GVCN
 
----
+1. Trong Authentication, tạo email nội bộ, ví dụ `gvcn.11b6-2026-2027@lop.local`.
+2. Sao chép UID của tài khoản.
+3. Trong Firestore, tạo tài liệu `classes/11b6-2026-2027/members/{uid}` với dữ liệu:
 
-## BƯỚC 3: KÍCH HOẠT CLOUD FIRESTORE & CÀI ĐẶT SECURITY RULES
+```json
+{
+  "active": true,
+  "displayName": "Cô Võ Thị Kim Liên",
+  "email": "gvcn.11b6-2026-2027@lop.local",
+  "role": "teacher"
+}
+```
 
-1. Trên menu trái, chọn **Build** ➔ **Firestore Database** ➔ Bấm **Create database**.
-2. Chọn vị trí máy chủ (Location): `asia-southeast1` (Singapore) hoặc vị trí gần nhất.
-3. Chọn chế độ bảo mật: Chọn **Start in production mode** ➔ Bấm **Create**.
-4. Chuyển sang tab **Rules**, dán toàn bộ nội dung trong tệp `firestore.rules` vào và bấm **Publish**.
+Ban cán sự và học sinh được tạo tương tự, dùng `role: "bcs"` hoặc `role: "student"`.
 
----
+## 5. Cấu hình biến môi trường trên máy
 
-## BƯỚC 4: THÊM TÊN MIỀN GITHUB PAGES VÀO AUTHORIZED DOMAINS
+Sao chép `.env.example` thành `.env.local` và điền cấu hình Firebase Web App. Không đưa `.env.local` lên GitHub.
 
-1. Vào **Authentication** ➔ Chọn tab **Settings** ➔ Chọn **Authorized domains**.
-2. Bấm **Add domain**:
-   - Nhập tên miền GitHub Pages của bạn (Ví dụ: `yourusername.github.io`).
-   - Bấm **Add**.
+Chạy thử:
 
----
+```cmd
+npm install
+npm run lint
+npm run build
+npm run dev
+```
 
-## BƯỚC 5: ĐƯA MÃ NGUỒN LÊN GITHUB & CẤU HÌNH GITHUB PAGES
+## 6. Cấu hình GitHub Actions
 
-1. Khởi tạo kho lưu trữ GitHub mới và đẩy mã nguồn lên:
-   ```bash
-   git init
-   git add .
-   git commit -m "feat: deploy Vuon Uom 11B6 static SPA to GitHub Pages"
-   git branch -M main
-   git remote add origin https://github.com/yourusername/vuon-uom-11b6.git
-   git push -u origin main
-   ```
-2. Cấu hình GitHub Secrets cho CI/CD:
-   - Vào GitHub Repo ➔ **Settings** ➔ **Secrets and variables** ➔ **Actions** ➔ **New repository secret**:
-     - `VITE_FIREBASE_API_KEY`: Giá trị apiKey
-     - `VITE_FIREBASE_AUTH_DOMAIN`: Giá trị authDomain
-     - `VITE_FIREBASE_PROJECT_ID`: Giá trị projectId
-     - `VITE_FIREBASE_STORAGE_BUCKET`: Giá trị storageBucket
-     - `VITE_FIREBASE_MESSAGING_SENDER_ID`: Giá trị messagingSenderId
-     - `VITE_FIREBASE_APP_ID`: Giá trị appId
-3. Kích hoạt GitHub Pages:
-   - Vào **Settings** ➔ **Pages**.
-   - Tại mục **Build and deployment** ➔ **Source**, chọn **GitHub Actions**.
-   - Quy trình `.github/workflows/deploy-pages.yml` sẽ tự động build và xuất bản trang web.
+Trong repository, vào **Settings → Secrets and variables → Actions** và tạo:
 
----
+- `VITE_FIREBASE_API_KEY`
+- `VITE_FIREBASE_AUTH_DOMAIN`
+- `VITE_FIREBASE_PROJECT_ID`
+- `VITE_FIREBASE_STORAGE_BUCKET`
+- `VITE_FIREBASE_MESSAGING_SENDER_ID`
+- `VITE_FIREBASE_APP_ID`
 
-## BƯỚC 6: ĐĂNG NHẬP VÀ KHỞI TẠO DỮ LIỆU LỚP
+Sau đó:
 
-1. Mở trang web GitHub Pages vừa xuất bản.
-2. Bấm **Đăng Nhập** ở góc trên màn hình ➔ Đăng nhập bằng Email `vothikimlien.pq@gmail.com` và Mật khẩu đã tạo ở Bước 2.
-3. Vào tab **Cài Đặt Lớp** ➔ Chọn mục **Dữ liệu & Khởi tạo**:
-   - Bấm **"Khởi tạo dữ liệu lớp 11B6"** để tự động nạp cấu hình lớp học và 30 quy chế điểm chuẩn.
+1. Vào **Settings → Pages**.
+2. Chọn nguồn triển khai **GitHub Actions**.
+3. Đẩy mã nguồn lên nhánh `main`.
+4. Chờ workflow `.github/workflows/deploy-pages.yml` hoàn thành.
+5. Thêm tên miền GitHub Pages, ví dụ `ten-tai-khoan.github.io`, vào **Authentication → Settings → Authorized domains**.
+
+## 7. Khởi tạo dữ liệu và Cổng Phụ huynh
+
+1. Mở website đã triển khai.
+2. Ở **Bước 1 / 2**, nhập Class ID và mật khẩu lớp.
+3. Ở **Bước 2 / 2**, chọn **Giáo viên chủ nhiệm**, rồi đăng nhập tài khoản GVCN.
+4. Vào **Cài đặt lớp → Dữ liệu & Khởi tạo** và khởi tạo cấu hình nếu Firestore còn trống.
+5. Thêm hoặc nhập danh sách học sinh.
+6. Vào **Danh sách học sinh** và bấm **Tạo mới mã PH**.
+7. Gửi riêng mã của từng học sinh cho đúng phụ huynh.
+
+Khi phụ huynh sử dụng: nhập Class ID và mật khẩu lớp ở bước 1, chọn **Phụ huynh** ở bước 2, rồi nhập mã mới dạng `PH11B6-XXXX-XXXX`. Mã cũ ngắn như `PH11B6-27` phải được thay bằng mã mới.
+
+## 8. Cập nhật phiên bản sau này
+
+1. Chép các tệp đã sửa vào repository.
+2. Commit với nội dung rõ ràng.
+3. Push lên `main`.
+4. Chờ GitHub Actions có dấu tích xanh.
+5. Nếu `firestore.rules` thay đổi, Publish lại Rules trong Firebase Console.
+6. Kiểm tra website bằng cửa sổ ẩn danh.

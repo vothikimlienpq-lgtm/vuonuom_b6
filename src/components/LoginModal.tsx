@@ -1,245 +1,226 @@
 import React, { useState } from 'react';
-import { 
-  X, 
-  Lock, 
-  Sparkles, 
-  ShieldCheck, 
-  KeyRound, 
+import {
   AlertCircle,
-  Clock,
-  Mail,
   Eye,
   EyeOff,
+  GraduationCap,
+  KeyRound,
+  Lock,
+  ShieldCheck,
+  Sparkles,
+  UserRound,
+  UsersRound,
+  X,
 } from 'lucide-react';
-import { UserRole } from '../types';
+import { FullClassData, UserRole, UserSession } from '../types';
 import { api } from '../services/api';
-import { TEACHER_EMAIL } from '../firebase/config';
 import { useToast } from './Toast';
+
+interface ParentAccessResult {
+  classId: string;
+  normalizedCode: string;
+  data: FullClassData;
+  session: UserSession;
+}
+
+type LoginRole = Exclude<UserRole, 'guest'>;
 
 interface LoginModalProps {
   isOpen: boolean;
-  onClose: () => void;
-  onLoginSuccess: (session: any) => void;
+  classId: string;
+  mandatory?: boolean;
+  onClose?: () => void;
+  onLoginSuccess: (session: UserSession) => void;
+  onParentLoginSuccess: (result: ParentAccessResult) => void;
 }
+
+const roleOptions: Array<{
+  role: LoginRole;
+  title: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+}> = [
+  { role: 'gvcn', title: 'Giáo Viên Chủ Nhiệm', description: 'Quản trị và chốt số', icon: Sparkles },
+  { role: 'bcs', title: 'Ban Cán Sự', description: 'Ghi điểm và báo bài', icon: ShieldCheck },
+  { role: 'student', title: 'Thành Viên', description: 'Theo dõi thông tin lớp', icon: UsersRound },
+  { role: 'parent', title: 'Phụ Huynh', description: 'Tra cứu đúng hồ sơ con', icon: KeyRound },
+];
+
+const roleLabels: Record<LoginRole, string> = {
+  gvcn: 'Giáo viên chủ nhiệm',
+  bcs: 'Ban cán sự',
+  student: 'Thành viên',
+  parent: 'Phụ huynh',
+};
 
 export const LoginModal: React.FC<LoginModalProps> = ({
   isOpen,
+  classId,
+  mandatory = false,
   onClose,
   onLoginSuccess,
+  onParentLoginSuccess,
 }) => {
-  const { success, error } = useToast();
-  const [selectedRole, setSelectedRole] = useState<UserRole>('gvcn');
-  const [email, setEmail] = useState(TEACHER_EMAIL);
+  const toast = useToast();
+  const [selectedRole, setSelectedRole] = useState<LoginRole | null>(null);
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [parentCode, setParentCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
-  const [lockoutMinutes, setLockoutMinutes] = useState<number | null>(null);
+  const [message, setMessage] = useState('');
 
   if (!isOpen) return null;
 
-  const handleLogin = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    setErrorMsg('');
+  const chooseRole = (role: LoginRole) => {
+    setSelectedRole(role);
+    setMessage('');
+  };
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!selectedRole) {
+      setMessage('Vui lòng chọn đúng chức năng trước khi đăng nhập.');
+      return;
+    }
+    setMessage('');
     setLoading(true);
-
     try {
-      const res = selectedRole === 'parent'
-        ? await api.lookupParentView(parentCode)
-        : await api.login({
-            email: selectedRole === 'gvcn' ? (email || TEACHER_EMAIL) : email,
-            password,
-          });
+      if (selectedRole === 'parent') {
+        const result = await api.lookupParentCode(parentCode, classId);
+        toast.success('Đã mở đúng hồ sơ học sinh.');
+        onParentLoginSuccess(result);
+        return;
+      }
 
-      if (res.success) {
-        success(res.message || 'Đăng nhập thành công!');
-        onLoginSuccess(res.session);
-        onClose();
+      const result = await api.login({ username, classId, password });
+      if (result.session.role !== selectedRole) {
+        await api.logout().catch(() => undefined);
+        throw new Error(
+          `Tài khoản này thuộc chức năng “${roleLabels[result.session.role as LoginRole] || result.session.role}”, không phải “${roleLabels[selectedRole]}”.`
+        );
       }
+      toast.success(`Đăng nhập ${roleLabels[selectedRole]} thành công.`);
+      onLoginSuccess(result.session);
     } catch (err: any) {
-      const msg = err.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.';
-      setErrorMsg(msg);
-      if (msg.includes('khóa') || msg.includes('RATE_LIMITED')) {
-        setLockoutMinutes(15);
-      }
-      error(msg);
+      const text = err.message || 'Thông tin đăng nhập không chính xác.';
+      setMessage(text);
+      toast.error(text);
     } finally {
       setLoading(false);
     }
   };
 
+  const selectedLabel = selectedRole ? roleLabels[selectedRole] : '';
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-emerald-950/70 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-[28px] max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-emerald-100 relative overflow-hidden">
-        
-        {/* Top Decorative accent */}
-        <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-amber-400 via-emerald-500 to-teal-400"></div>
-
-        <button
-          onClick={onClose}
-          className="absolute top-5 right-5 p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
-        >
-          <X className="w-5 h-5" />
-        </button>
-
-        {/* Modal Header */}
-        <div className="text-center mb-6">
-          <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-emerald-50 text-emerald-800 border border-emerald-100 flex items-center justify-center shadow-inner">
-            <Lock className="w-7 h-7 text-[#064e3b]" />
-          </div>
-          <h2 className="text-2xl font-black text-[#064e3b] tracking-tight">
-            Đăng Nhập Hệ Thống Lớp 11B6
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-600 mt-1">
-            Xác thực an toàn qua Firebase Authentication để quản lý dữ liệu lớp học
-          </p>
+    <div className="fixed inset-0 z-[90] flex items-center justify-center overflow-y-auto bg-emerald-950/75 p-4 backdrop-blur-sm">
+      <div className="relative my-auto w-full max-w-3xl rounded-[30px] bg-white p-6 shadow-2xl sm:p-9">
+        {!mandatory && onClose && (
+          <button type="button" aria-label="Đóng" onClick={onClose} className="absolute right-5 top-5 text-slate-400 hover:text-slate-700">
+            <X className="h-6 w-6" />
+          </button>
+        )}
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50">
+          <Lock className="h-8 w-8 text-[#064e3b]" />
+        </div>
+        <div className="mb-6 mt-4 text-center">
+          <div className="text-xs font-black tracking-widest text-amber-600">BƯỚC 2 / 2 • LỚP {classId.toUpperCase()}</div>
+          <h2 className="mt-1 text-3xl font-black text-[#064e3b]">Chọn Đúng Chức Năng</h2>
+          <p className="mt-2 text-sm text-slate-600">Mỗi tài khoản chỉ được vào đúng vai trò đã cấp trong Firebase.</p>
         </div>
 
-        {/* Role Selection Tabs */}
-        <div className="grid grid-cols-3 gap-2 mb-6">
-          {[
-            { id: 'gvcn' as UserRole, label: 'Giáo Viên Chủ Nhiệm', icon: Sparkles, desc: 'Toàn quyền quản trị & chốt sổ' },
-            { id: 'bcs' as UserRole, label: 'Ban Cán Sự / Quản lý', icon: ShieldCheck, desc: 'Ghi nhận điểm thi đua & báo bài' },
-            { id: 'parent' as UserRole, label: 'Phụ Huynh', icon: KeyRound, desc: 'Chỉ nhập mã tra cứu' },
-          ].map(tab => {
-            const Icon = tab.icon;
-            const isSelected = selectedRole === tab.id;
+        <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {roleOptions.map((option) => {
+            const Icon = option.icon;
+            const active = selectedRole === option.role;
             return (
               <button
-                key={tab.id}
+                key={option.role}
                 type="button"
-                onClick={() => {
-                  setSelectedRole(tab.id);
-                  if (tab.id === 'gvcn') {
-                    setEmail(TEACHER_EMAIL);
-                  } else if (tab.id !== 'parent') {
-                    setEmail('');
-                  }
-                  setErrorMsg('');
-                }}
-                className={`flex flex-col items-center justify-center p-3 rounded-2xl border text-xs font-bold transition-all duration-200 cursor-pointer ${
-                  isSelected
-                    ? 'bg-[#064e3b] text-amber-300 border-[#064e3b] shadow-md scale-102'
-                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                }`}
+                onClick={() => chooseRole(option.role)}
+                className={`rounded-2xl border p-4 text-center transition ${active ? 'border-emerald-900 bg-[#064e3b] text-white shadow-lg' : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-emerald-300'}`}
               >
-                <Icon className={`w-5 h-5 mb-1.5 ${isSelected ? 'text-amber-300' : 'text-slate-500'}`} />
-                <span className="font-black">{tab.label}</span>
-                <span className="text-[10px] font-normal opacity-80 mt-0.5 text-center">{tab.desc}</span>
+                <Icon className={`mx-auto h-7 w-7 ${active ? 'text-amber-300' : 'text-slate-500'}`} />
+                <div className={`mt-2 text-sm font-black ${active ? 'text-amber-300' : 'text-slate-800'}`}>{option.title}</div>
+                <div className={`mt-1 text-[11px] leading-snug ${active ? 'text-emerald-100' : 'text-slate-500'}`}>{option.description}</div>
               </button>
             );
           })}
         </div>
 
-        {/* Lockout Warning if any */}
-        {lockoutMinutes && (
-          <div className="mb-4 p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2.5">
-            <Clock className="w-5 h-5 text-rose-600 shrink-0" />
-            <span>Thiết bị tạm khóa 15 phút do nhập sai quá nhiều lần để bảo vệ an toàn.</span>
+        {message && (
+          <div className="mb-4 flex gap-2 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">
+            <AlertCircle className="h-5 w-5 shrink-0" /> {message}
           </div>
         )}
 
-        {errorMsg && !lockoutMinutes && (
-          <div className="mb-4 p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2.5">
-            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-            <span>{errorMsg}</span>
+        {!selectedRole ? (
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-sm font-semibold text-slate-500">
+            Chọn một trong bốn chức năng ở trên để tiếp tục.
           </div>
-        )}
-
-        {/* Input Form */}
-        <form onSubmit={handleLogin} className="space-y-4">
-          {selectedRole === 'parent' ? (
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
-                Mã tra cứu phụ huynh
+        ) : (
+          <form onSubmit={submit} className="space-y-4">
+            {selectedRole === 'parent' ? (
+              <label className="block text-sm font-black text-slate-700">
+                MÃ TRA CỨU PHỤ HUYNH
+                <span className="relative mt-2 block">
+                  <KeyRound className="absolute left-4 top-3.5 h-5 w-5 text-slate-400" />
+                  <input
+                    value={parentCode}
+                    onChange={(event) => setParentCode(event.target.value.toUpperCase())}
+                    required
+                    autoComplete="off"
+                    spellCheck={false}
+                    placeholder="Ví dụ: PH11B6-ABCD-2345"
+                    className="w-full rounded-2xl border border-slate-300 py-3 pl-12 pr-4 font-black uppercase tracking-wider focus:outline-none focus:ring-2 focus:ring-emerald-700"
+                  />
+                </span>
+                <span className="mt-2 block text-xs font-normal leading-relaxed text-slate-500">
+                  Dùng mã ngẫu nhiên mới do GVCN cấp. Mã ngắn kiểu cũ như PH11B6-27 không còn đủ an toàn.
+                </span>
               </label>
-              <div className="relative">
-                <KeyRound className="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={parentCode}
-                  onChange={(e) => setParentCode(e.target.value.toUpperCase().replace(/\s/g, ''))}
-                  placeholder="Ví dụ: PH-11B6-A7K92X"
-                  required
-                  autoComplete="off"
-                  className="w-full pl-11 pr-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-slate-900 font-black text-sm uppercase tracking-wide focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#064e3b] transition"
-                />
-              </div>
-              <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
-                Chỉ nhập mã riêng do giáo viên cấp. Phụ huynh không cần email hoặc mật khẩu Firebase.
-              </p>
-            </div>
-          ) : (
-            <>
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider flex items-center justify-between">
-              <span>{selectedRole === 'gvcn' ? 'Email GVCN (Firebase Auth)' : 'Email Tài Khoản Phân Quyền'}</span>
-              {selectedRole === 'gvcn' && (
-                <span className="text-[10px] text-amber-700 font-extrabold lowercase font-mono">{TEACHER_EMAIL}</span>
-              )}
-            </label>
-            <div className="relative">
-              <Mail className="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder={selectedRole === 'gvcn' ? TEACHER_EMAIL : 'email.bcs@domain.com'}
-                required
-                className="w-full pl-11 pr-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-slate-900 font-bold text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#064e3b] transition"
-              />
-            </div>
-          </div>
+            ) : (
+              <>
+                <label className="block text-sm font-black text-slate-700">
+                  {selectedRole === 'gvcn' ? 'EMAIL HOẶC TÊN ĐĂNG NHẬP GVCN' : `TÊN ĐĂNG NHẬP ${selectedLabel.toUpperCase()}`}
+                  <span className="relative mt-2 block">
+                    {selectedRole === 'student' ? <GraduationCap className="absolute left-4 top-3.5 h-5 w-5 text-slate-400" /> : <UserRound className="absolute left-4 top-3.5 h-5 w-5 text-slate-400" />}
+                    <input
+                      value={username}
+                      onChange={(event) => setUsername(event.target.value)}
+                      required
+                      autoComplete="username"
+                      placeholder={selectedRole === 'gvcn' ? 'Email Firebase của GVCN' : 'Ví dụ: loptruong hoặc hs01'}
+                      className="w-full rounded-2xl border border-slate-300 py-3 pl-12 pr-4 font-bold focus:outline-none focus:ring-2 focus:ring-emerald-700"
+                    />
+                  </span>
+                </label>
+                <label className="block text-sm font-black text-slate-700">
+                  MẬT KHẨU TÀI KHOẢN
+                  <span className="relative mt-2 block">
+                    <Lock className="absolute left-4 top-3.5 h-5 w-5 text-slate-400" />
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      required
+                      autoComplete="current-password"
+                      className="w-full rounded-2xl border border-slate-300 py-3 pl-12 pr-12 font-bold focus:outline-none focus:ring-2 focus:ring-emerald-700"
+                    />
+                    <button type="button" aria-label="Hiện hoặc ẩn mật khẩu" onClick={() => setShowPassword((value) => !value)} className="absolute right-4 top-3.5 text-slate-400">
+                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    </button>
+                  </span>
+                </label>
+              </>
+            )}
 
-          {/* Password input */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
-              Mật Khẩu Firebase Authentication
-            </label>
-            <div className="relative">
-              <Lock className="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Nhập mật khẩu..."
-                required
-                className="w-full pl-11 pr-11 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-slate-900 font-medium text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#064e3b] transition"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-              >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-            </div>
-            <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
-              * Mật khẩu được bảo vệ trực tiếp bởi Google Firebase Security. Không lưu mật khẩu trên trình duyệt hay mã nguồn.
-            </p>
-          </div>
-            </>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading || !!lockoutMinutes}
-            className="w-full py-3.5 px-4 rounded-2xl bg-[#064e3b] hover:bg-[#085f48] text-amber-300 font-black text-sm tracking-wide shadow-lg shadow-emerald-950/20 transition active:scale-[0.99] disabled:opacity-50 cursor-pointer"
-          >
-            {loading
-              ? (selectedRole === 'parent' ? 'Đang tra cứu mã...' : 'Đang xác thực qua Firebase...')
-              : (selectedRole === 'parent' ? 'TRA CỨU THÔNG TIN CON' : 'XÁC NHẬN ĐĂNG NHẬP')}
-          </button>
-        </form>
-
-        {/* Public View note */}
-        <div className="mt-6 pt-4 border-t border-slate-100 text-center">
-          <p className="text-xs text-slate-500">
-            Phụ huynh chỉ xem được thông tin của học sinh gắn với mã tra cứu; không xem danh sách lớp, không nhập điểm và không vào phần cài đặt.
-          </p>
-        </div>
-
+            <button disabled={loading} className="w-full rounded-2xl bg-[#064e3b] py-4 font-black text-amber-300 disabled:opacity-60">
+              {loading ? 'ĐANG XÁC THỰC...' : selectedRole === 'parent' ? 'TRA CỨU HỒ SƠ CỦA CON' : `ĐĂNG NHẬP ${selectedLabel.toUpperCase()}`}
+            </button>
+          </form>
+        )}
       </div>
     </div>
   );

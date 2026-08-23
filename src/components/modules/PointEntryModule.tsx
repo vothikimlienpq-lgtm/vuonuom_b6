@@ -154,10 +154,15 @@ export const PointEntryModule: React.FC<PointEntryModuleProps> = ({
     try {
       const res = await api.createTransaction({
         studentId: activeStudent.id,
+        studentName: activeStudent.fullName,
+        groupNumber: activeStudent.groupNumber,
         month: selectedMonth,
         week: selectedWeek,
         dayOfWeek: selectedDay,
         ruleId: selectedRule.id,
+        ruleContent: selectedRule.content,
+        type: selectedRule.type,
+        points: selectedRule.isFlexiblePoints ? flexiblePoints : selectedRule.defaultPoints,
         quantity,
         subject: selectedRule.requiresSubjectAndExamType ? subject : undefined,
         examType: selectedRule.requiresSubjectAndExamType ? examType : undefined,

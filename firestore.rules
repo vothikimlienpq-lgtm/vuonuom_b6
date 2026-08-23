@@ -1,135 +1,90 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper functions
-    function isAuthenticated() {
-      return request.auth != null;
+    function signedIn() { return request.auth != null; }
+    function memberPath(classId) { return /databases/$(database)/documents/classes/$(classId)/members/$(request.auth.uid); }
+    function activeMember(classId) { return signedIn() && exists(memberPath(classId)) && get(memberPath(classId)).data.active == true; }
+    function role(classId) { return get(memberPath(classId)).data.role; }
+    function isTeacher(classId) { return activeMember(classId) && (role(classId) == 'teacher' || role(classId) == 'gvcn'); }
+    function isBCS(classId) { return activeMember(classId) && role(classId) == 'bcs'; }
+    function isParent(classId) { return activeMember(classId) && role(classId) == 'parent'; }
+    function ownStudent(classId, studentId) { return isParent(classId) && get(memberPath(classId)).data.studentId == studentId; }
+    function validParentView(data) {
+      return data.schemaVersion == 1
+        && data.classId is string
+        && data.studentId is string
+        && data.student is map
+        && data.transactions is list
+        && data.timetable is list
+        && data.homeworkTasks is list;
     }
 
-    function isGVCN() {
-      return isAuthenticated() && request.auth.token.email == 'vothikimlien.pq@gmail.com';
+    match /users/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if false;
     }
 
-    function userRecord(classId) {
-      return get(/databases/$(database)/documents/classes/$(classId)/authorizedUsers/$(request.auth.uid));
+    // Public parent portal: unauthenticated users may GET one exact document
+    // only when they already know its unguessable document ID. Collection
+    // listing/querying is always blocked, so a guest cannot enumerate students.
+    match /parentViews/{lookupCode} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if validParentView(request.resource.data)
+        && isTeacher(request.resource.data.classId);
+      allow update: if validParentView(request.resource.data)
+        && request.resource.data.classId == resource.data.classId
+        && request.resource.data.studentId == resource.data.studentId
+        && (isTeacher(resource.data.classId) || isBCS(resource.data.classId));
+      allow delete: if isTeacher(resource.data.classId);
     }
 
-    function isBCS(classId) {
-      return isAuthenticated()
-        && exists(/databases/$(database)/documents/classes/$(classId)/authorizedUsers/$(request.auth.uid))
-        && userRecord(classId).data.role == 'bcs';
-    }
-
-    function canManageClassWork(classId) {
-      return isGVCN() || isBCS(classId);
-    }
-
-    // Root class documents
     match /classes/{classId} {
-      allow read: if true;
-      allow create, update, delete: if isGVCN();
+      allow read: if activeMember(classId);
+      allow create, update, delete: if isTeacher(classId);
 
-      // 1. Public student roster (Contains ONLY basic public info: id, orderNumber, fullName, gender, groupNumber, position)
+      match /members/{uid} {
+        allow read: if isTeacher(classId) || (signedIn() && request.auth.uid == uid);
+        allow create, update, delete: if isTeacher(classId);
+      }
+      match /parentViewLinks/{studentId} {
+        allow read: if isTeacher(classId) || isBCS(classId);
+        allow create, update, delete: if isTeacher(classId);
+      }
       match /students/{studentId} {
-        allow read: if true;
-        allow write: if isGVCN();
+        allow read: if activeMember(classId) && (!isParent(classId) || ownStudent(classId, studentId));
+        allow create, update, delete: if isTeacher(classId);
       }
-
-      // 2. Private student contact details & parent codes (Strictly GVCN only)
       match /privateStudentData/{studentId} {
-        allow read, write: if isGVCN();
+        allow read: if isTeacher(classId) || ownStudent(classId, studentId);
+        allow create, update, delete: if isTeacher(classId);
       }
-
-      // 3. Point Rules (Standard rules)
-      match /pointRules/{ruleId} {
-        allow read: if true;
-        allow write: if isGVCN();
-      }
-
-      // 4. Point Transactions (Strictly authenticated & authorized users: GVCN or authorized BCS. No public read)
       match /transactions/{transactionId} {
-        allow read: if canManageClassWork(classId);
-        allow create, update: if canManageClassWork(classId);
-        allow delete: if isGVCN();
+        allow read: if activeMember(classId) && (!isParent(classId) || resource.data.studentId == get(memberPath(classId)).data.studentId);
+        allow create: if (isTeacher(classId) || isBCS(classId))
+          && request.resource.data.studentId is string
+          && request.resource.data.studentName is string
+          && request.resource.data.studentName.size() > 0;
+        allow update: if isTeacher(classId) || isBCS(classId);
+        allow delete: if isTeacher(classId) || isBCS(classId);
       }
-
-      // 5. Day & Week Locks
-      match /dayLocks/{lockId} {
-        allow read: if true;
-        allow write: if canManageClassWork(classId);
-      }
-
-      match /weekLocks/{lockId} {
-        allow read: if true;
-        allow write: if isGVCN();
-      }
-
-      // 6. Group Bonuses
-      match /groupBonuses/{bonusId} {
-        allow read: if true;
-        allow write: if isGVCN();
-      }
-
-      // 7. School Rankings
-      match /schoolRankings/{rankingId} {
-        allow read: if true;
-        allow write: if isGVCN();
-      }
-
-      // 8. Timetable & Homework
-      match /timetable/{entryId} {
-        allow read: if true;
-        allow write: if canManageClassWork(classId);
-      }
-
-      match /homeworkTasks/{taskId} {
-        allow read: if true;
-        allow write: if canManageClassWork(classId);
-      }
-
-      // 9. Cleaning Duties & Assignments
-      match /cleaningDuties/{dutyId} {
-        allow read: if true;
-        allow write: if canManageClassWork(classId);
-      }
-
-      match /cleaningAssignments/{assignmentId} {
-        allow read: if true;
-        allow write: if canManageClassWork(classId);
-      }
-
-      // 10. Reminders
-      match /reminders/{reminderId} {
-        allow read: if true;
-        allow write: if canManageClassWork(classId);
-      }
-
-      // 11. Audit Logs (Immutable, only authorized users can append, only GVCN can read)
-      match /auditLogs/{logId} {
-        allow read: if isGVCN();
-        allow create: if canManageClassWork(classId);
+      match /pointRules/{id} { allow read: if activeMember(classId); allow write: if isTeacher(classId); }
+      match /homeworkTasks/{id} { allow read: if activeMember(classId); allow write: if isTeacher(classId) || isBCS(classId); }
+      match /timetable/{id} { allow read: if activeMember(classId); allow write: if isTeacher(classId) || isBCS(classId); }
+      match /dayLocks/{id} { allow read: if activeMember(classId) && !isParent(classId); allow write: if isTeacher(classId) || isBCS(classId); }
+      match /weekLocks/{id} { allow read: if activeMember(classId) && !isParent(classId); allow write: if isTeacher(classId); }
+      match /groupBonuses/{id} { allow read: if activeMember(classId) && !isParent(classId); allow write: if isTeacher(classId); }
+      match /schoolRankings/{id} { allow read: if activeMember(classId) && !isParent(classId); allow write: if isTeacher(classId); }
+      match /cleaningDuties/{id} { allow read: if activeMember(classId) && !isParent(classId); allow write: if isTeacher(classId) || isBCS(classId); }
+      match /cleaningAssignments/{id} { allow read: if activeMember(classId) && !isParent(classId); allow write: if isTeacher(classId) || isBCS(classId); }
+      match /reminders/{id} { allow read: if activeMember(classId) && !isParent(classId); allow write: if isTeacher(classId) || isBCS(classId); }
+      match /auditLogs/{id} {
+        allow read: if isTeacher(classId);
+        allow create: if isTeacher(classId) || isBCS(classId);
         allow update, delete: if false;
       }
-
-      // 12. Authorized Users (Role & Permission Grants managed by GVCN)
-      match /authorizedUsers/{userId} {
-        allow read: if isGVCN() || (isAuthenticated() && request.auth.uid == userId);
-        allow write: if isGVCN();
-      }
-
-      // 13. Parent lookup: only an exact active code may be read publicly.
-      // Listing all codes is forbidden; only GVCN can create or edit them.
-      match /parentViews/{code} {
-        allow get: if resource.data.active == true;
-        allow list: if false;
-        allow create, update, delete: if isGVCN();
-      }
+      match /{document=**} { allow read, write: if false; }
     }
-
-    // Default deny all other paths
-    match /{document=**} {
-      allow read, write: if false;
-    }
+    match /{document=**} { allow read, write: if false; }
   }
 }

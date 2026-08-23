@@ -3,7 +3,7 @@ import { ToastProvider, useToast } from './components/Toast';
 import { Header } from './components/Header';
 import { Navigation, ModuleTab } from './components/Navigation';
 import { LoginModal } from './components/LoginModal';
-import { ParentPortal } from './components/ParentPortal';
+import { ClassAccessGate } from './components/ClassAccessGate';
 import { OverviewModule } from './components/modules/OverviewModule';
 import { PointEntryModule } from './components/modules/PointEntryModule';
 import { GroupCompetitionModule } from './components/modules/GroupCompetitionModule';
@@ -17,13 +17,15 @@ import { ClassSettingsModule } from './components/modules/ClassSettingsModule';
 import { FullClassData, UserSession } from './types';
 import { api } from './services/api';
 import { getCurrentWeekAndMonth, getWeekDateRange } from './utils/dateUtils';
-import { LogIn, ShieldCheck, Sprout } from 'lucide-react';
+import { Sprout } from 'lucide-react';
 
 function MainAppContent() {
   const { success, error } = useToast();
 
   const [data, setData] = useState<FullClassData | null>(null);
   const [session, setSession] = useState<UserSession | null>(null);
+  const [verifiedClassId, setVerifiedClassId] = useState<string | null>(null);
+  const [parentLookupCode, setParentLookupCode] = useState<string | null>(null);
   
   // Default to current week & month calculation
   const initialTime = getCurrentWeekAndMonth();
@@ -31,26 +33,13 @@ function MainAppContent() {
   const [selectedWeek, setSelectedWeek] = useState<number>(initialTime.currentWeek);
   const [activeTab, setActiveTab] = useState<ModuleTab>('overview');
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [sessionReady, setSessionReady] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [showLoginModal, setShowLoginModal] = useState(true);
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
-  // Đọc phiên trước. Khách và phụ huynh không tải toàn bộ dữ liệu lớp.
+  // Tuyệt đối không đọc dữ liệu lớp trước khi hoàn tất cả hai lớp đăng nhập.
   useEffect(() => {
-    api.getCurrentSession().then(userSession => {
-      setSession(userSession);
-      setShowLoginModal(!userSession || userSession.role === 'guest');
-      setSessionReady(true);
-      if (!userSession || userSession.role === 'guest' || userSession.role === 'parent') {
-        setIsLoading(false);
-      }
-    });
-  }, []);
-
-  // Chỉ tài khoản thành viên lớp đã xác thực mới nhận toàn bộ dữ liệu thời gian thực.
-  useEffect(() => {
-    if (!sessionReady || !session || session.role === 'guest' || session.role === 'parent') return;
+    if (!verifiedClassId || !session || session.role === 'guest' || session.role === 'parent') return;
     setIsLoading(true);
     const unsubscribe = api.subscribeFullClassData((fullData) => {
       setData(fullData);
@@ -62,16 +51,34 @@ function MainAppContent() {
         setSelectedWeek(prev => prev === initialTime.currentWeek ? current.currentWeek : prev);
         setSelectedMonth(prev => prev === initialTime.currentMonth ? current.currentMonth : prev);
       }
-    });
+    }, session);
 
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
-  }, [sessionReady, session?.role, session?.username]);
+    return () => unsubscribe?.();
+  }, [verifiedClassId, session?.role, session?.username]);
+
+  // Phụ huynh chỉ theo dõi đúng một tài liệu parentViews/{mã}; không mở
+  // bất kỳ listener nào vào classes/{classId} hoặc các collection của lớp.
+  useEffect(() => {
+    if (!parentLookupCode || session?.role !== 'parent') return;
+    return api.subscribeParentView(
+      parentLookupCode,
+      (parentData, parentSession) => {
+        setData(parentData);
+        setSession(parentSession);
+      },
+      (message) => error(message)
+    );
+  }, [parentLookupCode, session?.role, error]);
 
   const fetchData = useCallback(async (quiet = false) => {
     if (!quiet) setIsSyncing(true);
     try {
+      if (parentLookupCode) {
+        const result = await api.lookupParentCode(parentLookupCode, verifiedClassId || undefined);
+        setData(result.data);
+        setSession(result.session);
+        return;
+      }
       const [fullData, userSession] = await Promise.all([
         api.getFullData(),
         api.getCurrentSession(),
@@ -93,7 +100,7 @@ function MainAppContent() {
       setIsLoading(false);
       setIsSyncing(false);
     }
-  }, [error]);
+  }, [error, parentLookupCode]);
 
   const handleSelectWeek = (week: number) => {
     setSelectedWeek(week);
@@ -112,7 +119,10 @@ function MainAppContent() {
       await api.logout();
       setSession(null);
       setData(null);
-      setShowLoginModal(true);
+      setVerifiedClassId(null);
+      setParentLookupCode(null);
+      setShowLoginModal(false);
+      setActiveTab('overview');
       success('Đã kết thúc phiên làm việc an toàn.');
     } catch (err: any) {
       error(err.message || 'Lỗi khi đăng xuất');
@@ -120,53 +130,56 @@ function MainAppContent() {
   };
 
   const handleLoginSuccess = (newSession: UserSession) => {
+    setParentLookupCode(null);
     setSession(newSession);
-    if (newSession.role !== 'parent') fetchData(true);
+    setActiveTab(newSession.role === 'parent' ? 'individual_conduct' : 'overview');
+    setShowLoginModal(false);
   };
 
-  if (!sessionReady) {
-    return (
-      <div className="min-h-screen bg-[#f8faf9] flex flex-col items-center justify-center p-4">
-        <div className="w-16 h-16 rounded-3xl bg-[#064e3b] p-3 shadow-xl flex items-center justify-center animate-bounce">
-          <Sprout className="w-10 h-10 text-amber-300" />
-        </div>
-        <h2 className="text-xl font-black text-[#064e3b] mt-4 tracking-tight">
-          Đang mở cổng đăng nhập
-        </h2>
-        <p className="text-xs text-emerald-800 font-semibold mt-1 animate-pulse">
-          Đang kiểm tra phiên làm việc an toàn...
-        </p>
-      </div>
-    );
-  }
+  const handleParentVerified = (result: Awaited<ReturnType<typeof api.lookupParentCode>>) => {
+    if (!verifiedClassId || result.classId.toLowerCase() !== verifiedClassId.toLowerCase()) {
+      error('Mã phụ huynh không thuộc lớp vừa được xác thực.');
+      return;
+    }
+    setParentLookupCode(result.normalizedCode);
+    setData(result.data);
+    setSession(result.session);
+    setActiveTab('individual_conduct');
+    if (result.data.config?.week1StartDate) {
+      const current = getCurrentWeekAndMonth(result.data.config.week1StartDate);
+      setSelectedWeek(current.currentWeek);
+      setSelectedMonth(current.currentMonth);
+    }
+  };
 
-  if (session?.role === 'parent') {
-    return <ParentPortal session={session} onLogout={handleLogout} />;
+  if (!verifiedClassId) {
+    return <ClassAccessGate onVerified={setVerifiedClassId} />;
   }
 
   if (!session || session.role === 'guest') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#043d2e] via-[#0b5b43] to-[#032b21] flex items-center justify-center p-4">
-        <div className="max-w-xl w-full rounded-[32px] bg-white/95 border border-emerald-100 p-8 text-center shadow-2xl">
-          <div className="w-16 h-16 mx-auto rounded-3xl bg-emerald-50 text-[#064e3b] flex items-center justify-center border border-emerald-100">
-            <ShieldCheck className="w-9 h-9" />
-          </div>
-          <h1 className="mt-5 text-3xl font-black text-[#064e3b]">Không gian lớp học</h1>
-          <p className="mt-2 text-sm text-slate-600">Vui lòng đăng nhập hoặc nhập mã tra cứu phụ huynh. Dữ liệu lớp không hiển thị trước khi xác thực.</p>
-          <button onClick={() => setShowLoginModal(true)} className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-[#064e3b] px-6 py-3 font-black text-amber-300 shadow-lg">
-            <LogIn className="w-5 h-5" /> MỞ CỬA SỔ ĐĂNG NHẬP
-          </button>
-        </div>
-        <LoginModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} onLoginSuccess={handleLoginSuccess} />
-      </div>
+      <LoginModal
+        isOpen
+        mandatory
+        classId={verifiedClassId}
+        onLoginSuccess={handleLoginSuccess}
+        onParentLoginSuccess={handleParentVerified}
+      />
     );
   }
 
   if (isLoading || !data) {
     return (
       <div className="min-h-screen bg-[#f8faf9] flex flex-col items-center justify-center p-4">
-        <div className="w-16 h-16 rounded-3xl bg-[#064e3b] p-3 shadow-xl flex items-center justify-center animate-bounce"><Sprout className="w-10 h-10 text-amber-300" /></div>
-        <h2 className="text-xl font-black text-[#064e3b] mt-4">Đang đồng bộ dữ liệu lớp học...</h2>
+        <div className="w-16 h-16 rounded-3xl bg-[#064e3b] p-3 shadow-xl flex items-center justify-center animate-bounce">
+          <Sprout className="w-10 h-10 text-amber-300" />
+        </div>
+        <h2 className="text-xl font-black text-[#064e3b] mt-4 tracking-tight">
+          Vườn Ươm 11B6 Kim Liên
+        </h2>
+        <p className="text-xs text-emerald-800 font-semibold mt-1 animate-pulse">
+          Đang khởi tạo và đồng bộ dữ liệu lớp học...
+        </p>
       </div>
     );
   }
@@ -331,8 +344,10 @@ function MainAppContent() {
       {/* Modals */}
       <LoginModal
         isOpen={showLoginModal}
+        classId={verifiedClassId}
         onClose={() => setShowLoginModal(false)}
         onLoginSuccess={handleLoginSuccess}
+        onParentLoginSuccess={handleParentVerified}
       />
 
     </div>

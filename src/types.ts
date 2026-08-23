@@ -211,29 +211,6 @@ export interface UserSession {
   groupNumber?: number;
   expiresAt: number; // timestamp ms
   bcsTimeRemaining?: number; // seconds
-  parentView?: ParentViewData;
-}
-
-export interface ParentViewData {
-  code: string;
-  active: boolean;
-  studentId: string;
-  studentName: string;
-  group: number;
-  currentScore: number;
-  allowTimetable: boolean;
-  conductData: {
-    plusPoints: number;
-    minusPoints: number;
-    totalScore: number;
-    violations: number;
-  };
-  weeklyHomework?: {
-    title?: string;
-    content?: string;
-    weekNumber?: number;
-  };
-  timetable?: TimetableEntry[];
 }
 
 export interface AuditLog {
@@ -260,4 +237,23 @@ export interface FullClassData {
   reminders: WeeklyReminder[];
   cleaningAssignments: CleaningAssignment[];
   currentSession?: UserSession;
+}
+
+/**
+ * Public, code-scoped projection used by the parent portal.
+ *
+ * A parent reads exactly one document at `parentViews/{lookupCode}`. The
+ * document deliberately contains only the parent's child plus the class
+ * timetable/homework that the portal is allowed to display.
+ */
+export interface ParentViewDocument {
+  schemaVersion: 1;
+  classId: string;
+  studentId: string;
+  updatedAt: string;
+  config: ClassConfig;
+  student: PublicStudent;
+  transactions: PointTransaction[];
+  timetable: TimetableEntry[];
+  homeworkTasks: HomeworkTask[];
 }

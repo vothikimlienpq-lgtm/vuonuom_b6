@@ -97,6 +97,14 @@ export const Header: React.FC<HeaderProps> = ({
         </span>
       );
     }
+    if (session.role === 'parent') {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-sky-100 text-sky-950 border border-sky-200">
+          <UserCheck className="w-3.5 h-3.5 text-sky-700" />
+          Cổng Phụ Huynh
+        </span>
+      );
+    }
     return (
       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-800/80 text-emerald-200 border border-emerald-700">
         <UserCheck className="w-3.5 h-3.5 text-emerald-300" />

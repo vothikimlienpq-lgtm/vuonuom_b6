@@ -50,7 +50,15 @@ export const Navigation: React.FC<NavigationProps> = ({
   onSelectTab,
   userRole = 'guest',
 }) => {
-  const navItems = NAV_ITEMS;
+  const canOpen = (id: ModuleTab) => {
+    if (id === 'class_settings') return userRole === 'gvcn';
+    if (id === 'point_entry') return userRole === 'gvcn' || userRole === 'bcs';
+    if (userRole === 'parent') return id === 'homework_schedule' || id === 'individual_conduct';
+    return userRole !== 'guest';
+  };
+  const navItems = NAV_ITEMS.filter(item => canOpen(item.id));
+  const primaryMobile = [NAV_ITEMS[0], NAV_ITEMS[1], NAV_ITEMS[2], NAV_ITEMS[6], NAV_ITEMS[8]].filter(item => canOpen(item.id));
+  const secondaryMobile = [NAV_ITEMS[3], NAV_ITEMS[4], NAV_ITEMS[5], NAV_ITEMS[7], NAV_ITEMS[9]].filter(item => canOpen(item.id));
 
   return (
     <>
@@ -62,8 +70,6 @@ export const Navigation: React.FC<NavigationProps> = ({
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.id;
-                const isGvcnOnly = (item as any).requiresGvcn && userRole !== 'gvcn';
-
                 return (
                   <button
                     key={item.id}
@@ -72,15 +78,10 @@ export const Navigation: React.FC<NavigationProps> = ({
                       isActive
                         ? 'bg-amber-400 text-emerald-950 shadow-md scale-[1.02]'
                         : 'text-emerald-900/80 hover:text-emerald-950 hover:bg-emerald-50'
-                    } ${isGvcnOnly ? 'opacity-70' : ''}`}
+                    }`}
                   >
                     <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-emerald-950 stroke-[2.5]' : 'text-emerald-700'}`} />
                     <span>{item.label}</span>
-                    {(item as any).requiresGvcn && userRole !== 'gvcn' && (
-                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-200 text-slate-600 font-semibold">
-                        GVCN
-                      </span>
-                    )}
                   </button>
                 );
               })}
@@ -94,13 +95,7 @@ export const Navigation: React.FC<NavigationProps> = ({
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-emerald-100 shadow-2xl py-1.5 px-2">
         <>
             <div className="grid grid-cols-5 gap-1 max-w-md mx-auto">
-              {[
-                NAV_ITEMS[0], // Tổng quan
-                NAV_ITEMS[1], // Nhập điểm
-                NAV_ITEMS[2], // Thi đua tổ
-                NAV_ITEMS[6], // Báo bài
-                NAV_ITEMS[8], // Rèn luyện
-              ].map((item) => {
+              {primaryMobile.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.id;
 
@@ -125,13 +120,7 @@ export const Navigation: React.FC<NavigationProps> = ({
             <div className="flex items-center justify-between px-2 pt-1 border-t border-emerald-50 text-xs">
               <span className="text-[10px] text-emerald-700 font-semibold">Mục khác:</span>
               <div className="flex items-center gap-1 overflow-x-auto py-0.5">
-                {[
-                  NAV_ITEMS[3], // Xếp hạng trường
-                  NAV_ITEMS[4], // Vi phạm
-                  NAV_ITEMS[5], // Học tập
-                  NAV_ITEMS[7], // Trực nhật
-                  NAV_ITEMS[9], // Cài đặt
-                ].map(item => (
+                {secondaryMobile.map(item => (
                   <button
                     key={item.id}
                     onClick={() => onSelectTab(item.id)}

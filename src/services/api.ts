@@ -2,6 +2,7 @@ import {
   collection,
   doc,
   getDoc,
+  getDocFromServer,
   getDocs,
   setDoc,
   updateDoc,
@@ -10,6 +11,7 @@ import {
   writeBatch,
   query,
   orderBy,
+  where,
   Unsubscribe,
 } from 'firebase/firestore';
 import {
@@ -23,7 +25,6 @@ import {
   db,
   auth,
   CLASS_ID,
-  TEACHER_EMAIL,
   isFirebaseConfigured,
   handleFirestoreError,
   OperationType,
@@ -48,63 +49,207 @@ import {
   ClassConfig,
   DayLock,
   WeekLock,
-  ParentViewData,
+  ParentViewDocument,
 } from '../types';
 
 // Root class document reference
-const classDocRef = doc(db, 'classes', CLASS_ID);
+let activeClassId = CLASS_ID;
+let classDocRef = doc(db, 'classes', activeClassId);
 
 // Subcollection references
-const studentsColRef = collection(db, 'classes', CLASS_ID, 'students');
-const privateStudentColRef = collection(db, 'classes', CLASS_ID, 'privateStudentData');
-const rulesColRef = collection(db, 'classes', CLASS_ID, 'pointRules');
-const transactionsColRef = collection(db, 'classes', CLASS_ID, 'transactions');
-const dayLocksColRef = collection(db, 'classes', CLASS_ID, 'dayLocks');
-const weekLocksColRef = collection(db, 'classes', CLASS_ID, 'weekLocks');
-const groupBonusesColRef = collection(db, 'classes', CLASS_ID, 'groupBonuses');
-const schoolRankingsColRef = collection(db, 'classes', CLASS_ID, 'schoolRankings');
-const timetableColRef = collection(db, 'classes', CLASS_ID, 'timetable');
-const homeworkColRef = collection(db, 'classes', CLASS_ID, 'homeworkTasks');
-const cleaningDutiesColRef = collection(db, 'classes', CLASS_ID, 'cleaningDuties');
-const remindersColRef = collection(db, 'classes', CLASS_ID, 'reminders');
-const cleaningAssignmentsColRef = collection(db, 'classes', CLASS_ID, 'cleaningAssignments');
-const auditLogsColRef = collection(db, 'classes', CLASS_ID, 'auditLogs');
-const authorizedUsersColRef = collection(db, 'classes', CLASS_ID, 'authorizedUsers');
-const parentViewsColRef = collection(db, 'classes', CLASS_ID, 'parentViews');
+let studentsColRef = collection(db, 'classes', activeClassId, 'students');
+let privateStudentColRef = collection(db, 'classes', activeClassId, 'privateStudentData');
+let rulesColRef = collection(db, 'classes', activeClassId, 'pointRules');
+let transactionsColRef = collection(db, 'classes', activeClassId, 'transactions');
+let dayLocksColRef = collection(db, 'classes', activeClassId, 'dayLocks');
+let weekLocksColRef = collection(db, 'classes', activeClassId, 'weekLocks');
+let groupBonusesColRef = collection(db, 'classes', activeClassId, 'groupBonuses');
+let schoolRankingsColRef = collection(db, 'classes', activeClassId, 'schoolRankings');
+let timetableColRef = collection(db, 'classes', activeClassId, 'timetable');
+let homeworkColRef = collection(db, 'classes', activeClassId, 'homeworkTasks');
+let cleaningDutiesColRef = collection(db, 'classes', activeClassId, 'cleaningDuties');
+let remindersColRef = collection(db, 'classes', activeClassId, 'reminders');
+let cleaningAssignmentsColRef = collection(db, 'classes', activeClassId, 'cleaningAssignments');
+let auditLogsColRef = collection(db, 'classes', activeClassId, 'auditLogs');
+let membersColRef = collection(db, 'classes', activeClassId, 'members');
+let parentViewLinksColRef = collection(db, 'classes', activeClassId, 'parentViewLinks');
+const parentViewsColRef = collection(db, 'parentViews');
 
-const PARENT_SESSION_KEY = `parent-view-session:${CLASS_ID}`;
+const selectClass = (classId: string) => {
+  activeClassId = normalizeLoginName(classId);
+  classDocRef = doc(db, 'classes', activeClassId);
+  studentsColRef = collection(db, 'classes', activeClassId, 'students');
+  privateStudentColRef = collection(db, 'classes', activeClassId, 'privateStudentData');
+  rulesColRef = collection(db, 'classes', activeClassId, 'pointRules');
+  transactionsColRef = collection(db, 'classes', activeClassId, 'transactions');
+  dayLocksColRef = collection(db, 'classes', activeClassId, 'dayLocks');
+  weekLocksColRef = collection(db, 'classes', activeClassId, 'weekLocks');
+  groupBonusesColRef = collection(db, 'classes', activeClassId, 'groupBonuses');
+  schoolRankingsColRef = collection(db, 'classes', activeClassId, 'schoolRankings');
+  timetableColRef = collection(db, 'classes', activeClassId, 'timetable');
+  homeworkColRef = collection(db, 'classes', activeClassId, 'homeworkTasks');
+  cleaningDutiesColRef = collection(db, 'classes', activeClassId, 'cleaningDuties');
+  remindersColRef = collection(db, 'classes', activeClassId, 'reminders');
+  cleaningAssignmentsColRef = collection(db, 'classes', activeClassId, 'cleaningAssignments');
+  auditLogsColRef = collection(db, 'classes', activeClassId, 'auditLogs');
+  membersColRef = collection(db, 'classes', activeClassId, 'members');
+  parentViewLinksColRef = collection(db, 'classes', activeClassId, 'parentViewLinks');
+};
 
-const readParentSession = (): UserSession | null => {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = window.sessionStorage.getItem(PARENT_SESSION_KEY);
-    if (!raw) return null;
-    const session = JSON.parse(raw) as UserSession;
-    if (session.role !== 'parent' || !session.parentView || session.expiresAt <= Date.now()) {
-      window.sessionStorage.removeItem(PARENT_SESSION_KEY);
-      return null;
+const normalizeLoginName = (value: string) => value
+  .trim()
+  .toLowerCase()
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .replace(/[^a-z0-9._-]/g, '');
+
+const internalEmail = (username: string, classId = CLASS_ID) =>
+  `${normalizeLoginName(username)}.${normalizeLoginName(classId)}@lop.local`;
+
+const withoutUndefined = <T extends Record<string, unknown>>(value: T): T =>
+  Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined)) as T;
+
+const normalizeParentCode = (value: string) => value
+  .trim()
+  .toUpperCase()
+  .replace(/\s+/g, '')
+  .replace(/[^A-Z0-9-]/g, '');
+
+const generateParentCode = (): string => {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const bytes = new Uint8Array(8);
+  crypto.getRandomValues(bytes);
+  const token = Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join('');
+  const classPrefix = (activeClassId.split('-')[0] || 'LOP').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return `PH${classPrefix}-${token.slice(0, 4)}-${token.slice(4)}`;
+};
+
+const toPublicStudent = (student: Student | PublicStudent): PublicStudent => ({
+  id: student.id,
+  orderNumber: Number(student.orderNumber) || 0,
+  fullName: String(student.fullName || '').trim(),
+  gender: student.gender,
+  groupNumber: Number(student.groupNumber) || 0,
+  position: student.position || 'Thành viên',
+});
+
+const makeParentView = (student: Student | PublicStudent): ParentViewDocument => {
+  const view: ParentViewDocument = {
+    schemaVersion: 1,
+    classId: activeClassId,
+    studentId: student.id,
+    updatedAt: new Date().toISOString(),
+    config: latestFullData.config,
+    student: toPublicStudent(student),
+    transactions: latestFullData.transactions.filter((tx) => tx.studentId === student.id),
+    timetable: latestFullData.timetable,
+    homeworkTasks: latestFullData.homeworkTasks,
+  };
+  // Firestore rejects undefined values even when they are nested inside arrays.
+  // Parent views are plain JSON projections, so this safely removes every
+  // optional undefined field before the document is written.
+  return JSON.parse(JSON.stringify(view)) as ParentViewDocument;
+};
+
+const fullDataFromParentView = (view: ParentViewDocument): FullClassData => ({
+  config: view.config,
+  students: [view.student],
+  rules: [],
+  transactions: view.transactions || [],
+  dayLocks: [],
+  weekLocks: [],
+  groupBonuses: [],
+  schoolRankings: [],
+  timetable: view.timetable || [],
+  homeworkTasks: view.homeworkTasks || [],
+  cleaningDuties: [],
+  reminders: [],
+  cleaningAssignments: [],
+});
+
+const sessionFromParentView = (view: ParentViewDocument): UserSession => ({
+  role: 'parent',
+  username: `Phụ huynh em ${view.student.fullName}`,
+  studentId: view.studentId,
+  studentName: view.student.fullName,
+  groupNumber: view.student.groupNumber,
+  expiresAt: Date.now() + 2 * 3600 * 1000,
+});
+
+const findParentCodeForStudent = async (studentId: string): Promise<string | null> => {
+  const linkSnap = await getDoc(doc(parentViewLinksColRef, studentId));
+  if (!linkSnap.exists()) return null;
+  const code = normalizeParentCode(String(linkSnap.data().code || ''));
+  return code || null;
+};
+
+const syncParentViewForStudent = async (studentId: string, explicitCode?: string): Promise<void> => {
+  const student = latestFullData.students.find((item) => item.id === studentId);
+  if (!student) return;
+  const linkedCode = await findParentCodeForStudent(studentId);
+  const cachedCode = normalizeParentCode(String(privateStudentCache.get(studentId)?.parentCode || ''));
+  const code = normalizeParentCode(explicitCode || '') || linkedCode || cachedCode;
+  if (!code) return;
+  if (!linkedCode && auth.currentUser) {
+    await setDoc(doc(parentViewLinksColRef, studentId), {
+      classId: activeClassId,
+      studentId,
+      code,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+  await setDoc(doc(parentViewsColRef, code), withoutUndefined(makeParentView(student) as unknown as Record<string, unknown>));
+};
+
+const syncAllParentViews = async (): Promise<void> => {
+  const linkSnaps = await getDocs(parentViewLinksColRef);
+  if (linkSnaps.empty) return;
+  const batch = writeBatch(db);
+  linkSnaps.docs.forEach((linkSnap) => {
+    const student = latestFullData.students.find((item) => item.id === linkSnap.id);
+    const code = normalizeParentCode(String(linkSnap.data().code || ''));
+    if (student && code) {
+      batch.set(doc(parentViewsColRef, code), withoutUndefined(makeParentView(student) as unknown as Record<string, unknown>));
     }
-    return session;
-  } catch {
-    window.sessionStorage.removeItem(PARENT_SESSION_KEY);
-    return null;
+  });
+  await batch.commit();
+};
+
+const safelySyncParentViewForStudent = async (studentId: string, explicitCode?: string): Promise<void> => {
+  try {
+    await syncParentViewForStudent(studentId, explicitCode);
+  } catch (error) {
+    console.warn('Parent view sync error:', error);
   }
 };
 
-const storeParentSession = (session: UserSession) => {
-  if (typeof window !== 'undefined') {
-    window.sessionStorage.setItem(PARENT_SESSION_KEY, JSON.stringify(session));
+const safelySyncAllParentViews = async (): Promise<void> => {
+  try {
+    await syncAllParentViews();
+  } catch (error) {
+    console.warn('Parent views sync error:', error);
   }
 };
 
-const clearParentSession = () => {
-  if (typeof window !== 'undefined') window.sessionStorage.removeItem(PARENT_SESSION_KEY);
-};
-
-const numberOrZero = (value: unknown): number => {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-};
+async function sessionFromMember(user: User): Promise<UserSession> {
+  const memberSnap = await getDoc(doc(membersColRef, user.uid));
+  if (!memberSnap.exists() || memberSnap.data().active !== true) {
+    throw new Error('Tài khoản này chưa được giáo viên cấp quyền vào lớp.');
+  }
+  const member = memberSnap.data();
+  const roleMap: Record<string, UserRole> = {
+    teacher: 'gvcn', gvcn: 'gvcn', bcs: 'bcs', student: 'student', parent: 'parent',
+  };
+  const role = roleMap[String(member.role || '')] || 'student';
+  return {
+    role,
+    username: member.displayName || user.email || 'Thành viên lớp',
+    studentId: member.studentId || undefined,
+    studentName: member.studentName || undefined,
+    groupNumber: member.groupNumber || undefined,
+    expiresAt: Date.now() + 8 * 3600 * 1000,
+  };
+}
 
 // Default initial config
 export const DEFAULT_INITIAL_CONFIG: ClassConfig = {
@@ -202,76 +347,98 @@ export const api = {
   // AUTHENTICATION (Firebase Authentication onAuthStateChanged)
   // -------------------------------------------------------------
 
-  lookupParentView: async (code: string): Promise<{ success: boolean; session: UserSession; message: string }> => {
-    const normalizedCode = String(code || '').trim().toUpperCase();
-    if (!/^[A-Z0-9-]{6,40}$/.test(normalizedCode)) {
-      throw new Error('Mã tra cứu không đúng định dạng. Vui lòng kiểm tra lại mã giáo viên đã cấp.');
+  lookupParentCode: async (rawCode: string, expectedClassId?: string): Promise<{
+    classId: string;
+    normalizedCode: string;
+    data: FullClassData;
+    session: UserSession;
+  }> => {
+    const code = normalizeParentCode(rawCode);
+    if (code.length < 12) {
+      throw new Error('Đây là mã phụ huynh kiểu cũ hoặc chưa đủ an toàn. GVCN cần vào Cài đặt → Danh sách lớp → Tạo mới mã PH, rồi cấp lại mã mới.');
     }
-
     try {
-      const snapshot = await getDoc(doc(parentViewsColRef, normalizedCode));
-      if (!snapshot.exists() || snapshot.data().active !== true) {
-        throw new Error('Mã tra cứu không tồn tại hoặc đã bị khóa.');
+      if (auth.currentUser) await signOut(auth).catch(() => undefined);
+      const snap = await getDocFromServer(doc(parentViewsColRef, code));
+      if (!snap.exists()) {
+        throw new Error('Không tìm thấy mã tra cứu. Vui lòng kiểm tra lại hoặc liên hệ GVCN.');
       }
-
-      const raw = snapshot.data();
-      const studentId = String(raw.studentId || '').trim();
-      const studentName = String(raw.studentName || '').trim();
-      if (!studentId || !studentName || studentId === 'ID học sinh' || studentName === 'Họ tên học sinh') {
-        throw new Error('Mã này chưa được giáo viên gắn với học sinh thật. Vui lòng liên hệ giáo viên chủ nhiệm.');
+      const view = snap.data() as ParentViewDocument;
+      if (view.schemaVersion !== 1 || !view.student?.id || !view.classId) {
+        throw new Error('Dữ liệu tra cứu chưa được khởi tạo đúng. Vui lòng liên hệ GVCN.');
       }
-
-      const conduct = raw.conductData && typeof raw.conductData === 'object' ? raw.conductData : {};
-      const homework = raw.weeklyHomework && typeof raw.weeklyHomework === 'object'
-        ? {
-            title: String(raw.weeklyHomework.title || 'Báo bài tuần'),
-            content: String(raw.weeklyHomework.content || ''),
-            weekNumber: numberOrZero(raw.weeklyHomework.weekNumber),
-          }
-        : undefined;
-
-      const parentView: ParentViewData = {
-        code: normalizedCode,
-        active: true,
-        studentId,
-        studentName,
-        group: numberOrZero(raw.group),
-        currentScore: numberOrZero(raw.currentScore),
-        allowTimetable: raw.allowTimetable === true,
-        conductData: {
-          plusPoints: numberOrZero(conduct.plusPoints),
-          minusPoints: numberOrZero(conduct.minusPoints),
-          totalScore: numberOrZero(conduct.totalScore),
-          violations: numberOrZero(conduct.violations),
-        },
-        weeklyHomework: homework,
-        timetable: raw.allowTimetable === true && Array.isArray(raw.timetable) ? raw.timetable : undefined,
+      if (expectedClassId && normalizeLoginName(view.classId) !== normalizeLoginName(expectedClassId)) {
+        throw new Error('Mã tra cứu không thuộc lớp vừa được xác thực. Vui lòng kiểm tra lại mã.');
+      }
+      return {
+        classId: view.classId,
+        normalizedCode: code,
+        data: fullDataFromParentView(view),
+        session: sessionFromParentView(view),
       };
-
-      const session: UserSession = {
-        role: 'parent',
-        username: `Phụ huynh của ${studentName}`,
-        studentId,
-        studentName,
-        groupNumber: parentView.group,
-        parentView,
-        expiresAt: Date.now() + 12 * 60 * 60 * 1000,
-      };
-      storeParentSession(session);
-      return { success: true, session, message: `Đã mở thông tin của học sinh ${studentName}.` };
     } catch (err: any) {
-      if (err?.message?.startsWith('Mã ') || err?.message?.startsWith('Mã này')) throw err;
-      throw new Error('Không thể tra cứu mã phụ huynh. Vui lòng kiểm tra kết nối hoặc quyền Firestore.');
+      if (
+        err?.message?.includes('Không tìm thấy')
+        || err?.message?.includes('chưa được khởi tạo')
+        || err?.message?.includes('không thuộc lớp')
+      ) throw err;
+      if (err?.code === 'permission-denied' || err?.code === 'firestore/permission-denied') {
+        throw new Error('Firestore Rules chưa cho phép đọc parentViews. GVCN cần dán đúng tệp firestore.rules mới và bấm Publish.');
+      }
+      if (err?.code === 'unavailable' || err?.code === 'firestore/unavailable') {
+        throw new Error('Không kết nối được Firestore. Vui lòng kiểm tra mạng và thử lại.');
+      }
+      throw new Error('Không thể tra cứu mã phụ huynh. Nếu vừa cập nhật hệ thống, GVCN hãy bấm “Tạo mới mã PH” một lần rồi dùng mã mới.');
+    }
+  },
+
+  subscribeParentView: (
+    rawCode: string,
+    callback: (data: FullClassData, session: UserSession) => void,
+    onError?: (message: string) => void
+  ): Unsubscribe => {
+    const code = normalizeParentCode(rawCode);
+    return onSnapshot(
+      doc(parentViewsColRef, code),
+      (snap) => {
+        if (!snap.exists()) {
+          onError?.('Mã tra cứu đã hết hiệu lực. Vui lòng liên hệ GVCN để nhận mã mới.');
+          return;
+        }
+        const view = snap.data() as ParentViewDocument;
+        callback(fullDataFromParentView(view), sessionFromParentView(view));
+      },
+      () => onError?.('Không thể đồng bộ cổng phụ huynh. Vui lòng thử lại sau.')
+    );
+  },
+
+  verifyClassAccess: async (payload: {
+    classId: string;
+    password: string;
+  }): Promise<{ success: boolean; message: string }> => {
+    const classId = normalizeLoginName(payload.classId);
+    if (!classId || !payload.password) throw new Error('Vui lòng nhập Class ID và mật khẩu lớp.');
+    try {
+      await signInWithEmailAndPassword(auth, `${classId}@lop.local`, payload.password);
+      await signOut(auth);
+      selectClass(classId);
+      return { success: true, message: 'Đã xác thực Class ID.' };
+    } catch (err: any) {
+      if (auth.currentUser) await signOut(auth).catch(() => undefined);
+      if (err.code === 'auth/too-many-requests') throw new Error('Nhập sai quá nhiều lần. Vui lòng thử lại sau.');
+      throw new Error('Class ID hoặc mật khẩu lớp không chính xác.');
     }
   },
 
   login: async (payload: {
-    email: string;
+    username: string;
+    classId?: string;
     password?: string;
   }): Promise<{ success: boolean; session: UserSession; message: string }> => {
-    const { email, password } = payload;
-    const cleanEmail = (email || TEACHER_EMAIL).trim();
-    clearParentSession();
+    const { username, password } = payload;
+    const input = username.trim();
+    if (payload.classId) selectClass(payload.classId);
+    const cleanEmail = input.includes('@') ? input.toLowerCase() : internalEmail(input, payload.classId);
 
     if (!password) {
       throw new Error('Vui lòng nhập mật khẩu tài khoản.');
@@ -279,46 +446,19 @@ export const api = {
 
     try {
       const userCredential = await signInWithEmailAndPassword(auth, cleanEmail, password);
-      const isTeacher = userCredential.user.email?.toLowerCase() === TEACHER_EMAIL.toLowerCase();
-
-      let role: UserRole = 'guest';
-      let username = userCredential.user.email || 'Người dùng';
-
-      if (isTeacher) {
-        role = 'gvcn';
-        username = 'Cô Võ Thị Kim Liên (GVCN)';
-      } else {
-        // Check if user is in authorizedUsers collection
-        try {
-          const authUserDoc = await getDoc(doc(authorizedUsersColRef, userCredential.user.uid));
-          if (authUserDoc.exists()) {
-            role = 'bcs';
-            username = authUserDoc.data().displayName || `Ban Cán Sự (${userCredential.user.email})`;
-          } else {
-            role = 'student';
-          }
-        } catch {
-          role = 'student';
-        }
-      }
-
-      const session: UserSession = {
-        role,
-        username,
-        expiresAt: Date.now() + 7 * 24 * 3600 * 1000,
-      };
+      const session = await sessionFromMember(userCredential.user);
 
       return {
         success: true,
         session,
-        message: `Đăng nhập thành công (${cleanEmail}).`,
+        message: `Đăng nhập thành công với vai trò ${session.role}.`,
       };
     } catch (err: any) {
       let msg = 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.';
       if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
         msg = 'Mật khẩu không chính xác.';
       } else if (err.code === 'auth/user-not-found') {
-        msg = `Tài khoản ${cleanEmail} chưa tồn tại trên Firebase Authentication. Vui lòng đăng ký trên Firebase Console.`;
+        msg = 'Tên đăng nhập chưa tồn tại hoặc chưa được tạo trên Firebase Authentication.';
       } else if (err.code === 'auth/too-many-requests') {
         msg = 'Nhập sai quá nhiều lần. Thiết bị tạm khóa để bảo vệ an toàn.';
       } else if (err.message) {
@@ -329,7 +469,6 @@ export const api = {
   },
 
   logout: async () => {
-    clearParentSession();
     try {
       if (auth.currentUser) {
         await signOut(auth);
@@ -340,9 +479,6 @@ export const api = {
   },
 
   getCurrentSession: async (): Promise<UserSession> => {
-    const parentSession = readParentSession();
-    if (parentSession) return parentSession;
-
     const currentUser = auth.currentUser;
     if (!currentUser || !currentUser.email) {
       return {
@@ -352,44 +488,20 @@ export const api = {
       };
     }
 
-    const isTeacher = currentUser.email.toLowerCase() === TEACHER_EMAIL.toLowerCase();
-    if (isTeacher) {
-      return {
-        role: 'gvcn',
-        username: 'Cô Võ Thị Kim Liên (GVCN)',
-        expiresAt: Date.now() + 7 * 24 * 3600 * 1000,
-      };
-    }
-
-    // Check authorizedUsers
     try {
-      const authUserDoc = await getDoc(doc(authorizedUsersColRef, currentUser.uid));
-      if (authUserDoc.exists()) {
-        return {
-          role: 'bcs',
-          username: authUserDoc.data().displayName || `Ban Cán Sự (${currentUser.email})`,
-          expiresAt: Date.now() + 7 * 24 * 3600 * 1000,
-        };
-      }
+      return await sessionFromMember(currentUser);
     } catch {
-      // Fall through
+      await signOut(auth).catch(() => undefined);
     }
 
     return {
-      role: 'student',
-      username: currentUser.email,
-      expiresAt: Date.now() + 7 * 24 * 3600 * 1000,
+      role: 'guest', username: 'Chưa đăng nhập', expiresAt: 0,
     };
   },
 
   onAuthStateChanged: (callback: (session: UserSession) => void): Unsubscribe => {
     return onAuthStateChanged(auth, async (user: User | null) => {
       if (!user || !user.email) {
-        const parentSession = readParentSession();
-        if (parentSession) {
-          callback(parentSession);
-          return;
-        }
         callback({
           role: 'guest',
           username: 'Khách / Thành Viên Lớp',
@@ -398,34 +510,15 @@ export const api = {
         return;
       }
 
-      const isTeacher = user.email.toLowerCase() === TEACHER_EMAIL.toLowerCase();
-      if (isTeacher) {
-        callback({
-          role: 'gvcn',
-          username: 'Cô Võ Thị Kim Liên (GVCN)',
-          expiresAt: Date.now() + 7 * 24 * 3600 * 1000,
-        });
-        return;
-      }
-
       try {
-        const authUserDoc = await getDoc(doc(authorizedUsersColRef, user.uid));
-        if (authUserDoc.exists()) {
-          callback({
-            role: 'bcs',
-            username: authUserDoc.data().displayName || `Ban Cán Sự (${user.email})`,
-            expiresAt: Date.now() + 7 * 24 * 3600 * 1000,
-          });
-          return;
-        }
+        callback(await sessionFromMember(user));
+        return;
       } catch {
-        // Fall through
+        await signOut(auth).catch(() => undefined);
       }
 
       callback({
-        role: 'student',
-        username: user.email,
-        expiresAt: Date.now() + 7 * 24 * 3600 * 1000,
+        role: 'guest', username: 'Chưa đăng nhập', expiresAt: 0,
       });
     });
   },
@@ -434,7 +527,7 @@ export const api = {
   // REAL-TIME FIRESTORE SUBSCRIPTIONS
   // -------------------------------------------------------------
 
-  subscribeFullClassData: (callback: (data: FullClassData) => void): (() => void) => {
+  subscribeFullClassData: (callback: (data: FullClassData) => void, session?: UserSession): (() => void) => {
     if (!isFirebaseConfigured()) {
       callback(latestFullData);
       return () => {};
@@ -473,10 +566,7 @@ export const api = {
       const unsubStudents = onSnapshot(
         studentsQuery,
         (snap) => {
-          const publicStudents = snap.docs.map((d) => ({
-            id: d.id,
-            ...d.data(),
-          })) as PublicStudent[];
+          const publicStudents = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as PublicStudent[];
 
           latestFullData.students = publicStudents.map((ps) => {
             const privateInfo = privateStudentCache.get(ps.id);
@@ -516,24 +606,18 @@ export const api = {
         authDependentUnsubscribes.length = 0;
 
         if (currentUser) {
-          const isTeacher =
-            currentUser.email?.toLowerCase() === TEACHER_EMAIL.toLowerCase() ||
-            currentUser.email?.toLowerCase() === 'vothikimlien.pq@gmail.com';
-
-          let isAuthorized = isTeacher;
-          if (!isAuthorized) {
-            try {
-              const authDoc = await getDoc(doc(authorizedUsersColRef, currentUser.uid));
-              if (authDoc.exists()) isAuthorized = true;
-            } catch {
-              isAuthorized = false;
-            }
-          }
+          const memberDoc = await getDoc(doc(membersColRef, currentUser.uid));
+          const member = memberDoc.exists() ? memberDoc.data() : null;
+          const isAuthorized = member?.active === true;
+          const isTeacher = member?.role === 'teacher' || member?.role === 'gvcn';
 
           if (isAuthorized) {
             // Subscribe to transactions
+            const txSource = member?.role === 'parent' && member?.studentId
+              ? query(transactionsColRef, where('studentId', '==', member.studentId))
+              : transactionsColRef;
             const unsubTx = onSnapshot(
-              transactionsColRef,
+              txSource,
               (snap) => {
                 latestFullData.transactions = snap.docs.map((d) => ({
                   id: d.id,
@@ -785,6 +869,8 @@ export const api = {
   updateClassConfig: async (config: Partial<ClassConfig>): Promise<{ success: boolean; message: string }> => {
     try {
       await setDoc(classDocRef, config, { merge: true });
+      latestFullData.config = { ...latestFullData.config, ...config };
+      await safelySyncAllParentViews();
       return { success: true, message: 'Cập nhật cấu hình lớp học thành công!' };
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, 'classes/11b6-2026-2027');
@@ -851,45 +937,62 @@ export const api = {
     reason?: string;
   }): Promise<{ success: boolean; transaction: PointTransaction; message: string }> => {
     try {
-      const matchedStudent = latestFullData.students.find((student) => student.id === payload.studentId);
-      const studentName = String(payload.studentName || matchedStudent?.fullName || '').trim();
-      if (!payload.studentId || !studentName) {
+      const txId = `TX_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+      const selectedStudent = latestFullData.students.find((student) => student.id === payload.studentId);
+      const selectedRule = latestFullData.rules.find((rule) => rule.id === payload.ruleId);
+      const safeStudentName = String(payload.studentName || selectedStudent?.fullName || '').trim();
+      const safeGroupNumber = Number(payload.groupNumber ?? selectedStudent?.groupNumber);
+      const safeRuleContent = String(payload.ruleContent || selectedRule?.content || '').trim();
+      const safeType = payload.type || selectedRule?.type;
+      const safePoints = Number(payload.points ?? selectedRule?.defaultPoints);
+
+      if (!payload.studentId || !safeStudentName) {
         throw new Error('Không xác định được học sinh. Vui lòng chọn lại học sinh trước khi lưu điểm.');
       }
-      const qty = payload.quantity || 1;
-      const totalPts = payload.points * qty;
-      const txId = `TX_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+      if (!Number.isFinite(safeGroupNumber)) {
+        throw new Error('Không xác định được tổ của học sinh. Vui lòng kiểm tra lại danh sách lớp.');
+      }
+      if (!safeRuleContent || (safeType !== 'plus' && safeType !== 'minus') || !Number.isFinite(safePoints)) {
+        throw new Error('Quy định điểm chưa đầy đủ. Vui lòng chọn lại quy định trước khi lưu.');
+      }
+
+      const qty = Number(payload.quantity) || 1;
+      const totalPts = safePoints * qty;
 
       const currentSession = await api.getCurrentSession();
       const newTx: PointTransaction = {
         id: txId,
         studentId: payload.studentId,
-        studentName,
-        groupNumber: payload.groupNumber,
+        studentName: safeStudentName,
+        groupNumber: safeGroupNumber,
         month: payload.month,
         week: payload.week,
         dayOfWeek: payload.dayOfWeek,
         ruleId: payload.ruleId,
-        ruleContent: payload.ruleContent,
-        type: payload.type,
-        points: payload.points,
+        ruleContent: safeRuleContent,
+        type: safeType,
+        points: safePoints,
         quantity: qty,
         totalPoints: totalPts,
+        subject: payload.subject,
+        examType: payload.examType,
+        reason: payload.reason,
         createdBy: currentSession.username,
         creatorRole: currentSession.role === 'gvcn' ? 'gvcn' : 'bcs',
         createdAt: new Date().toISOString(),
       };
 
-      if (payload.subject?.trim()) newTx.subject = payload.subject.trim();
-      if (payload.examType?.trim()) newTx.examType = payload.examType.trim();
-      if (payload.reason?.trim()) newTx.reason = payload.reason.trim();
-
-      await setDoc(doc(transactionsColRef, txId), newTx);
+      await setDoc(doc(transactionsColRef, txId), withoutUndefined(newTx as unknown as Record<string, unknown>));
+      latestFullData.transactions = [
+        ...latestFullData.transactions.filter((tx) => tx.id !== txId),
+        newTx,
+      ];
+      await safelySyncParentViewForStudent(payload.studentId);
 
       return {
         success: true,
         transaction: newTx,
-        message: `Đã ghi nhận ${payload.type === 'plus' ? 'điểm cộng' : 'điểm trừ'} cho học sinh ${studentName}.`,
+        message: `Đã ghi nhận ${payload.type === 'plus' ? 'điểm cộng' : 'điểm trừ'} cho học sinh ${safeStudentName}.`,
       };
     } catch (err) {
       handleFirestoreError(err, OperationType.CREATE, 'transactions');
@@ -906,17 +1009,21 @@ export const api = {
   ): Promise<{ success: boolean; transaction: PointTransaction; message: string }> => {
     try {
       const txDocRef = doc(transactionsColRef, id);
-      const cleanPayload = Object.fromEntries(
-        Object.entries(payload).filter(([, value]) => value !== undefined)
-      );
-      const updateData = {
-        ...cleanPayload,
+      const existing = latestFullData.transactions.find((tx) => tx.id === id);
+      const updateData = withoutUndefined({
+        ...payload,
         updatedAt: new Date().toISOString(),
-      };
+      });
       await updateDoc(txDocRef, updateData);
+      const updated = { ...(existing || {}), ...payload, id } as PointTransaction;
+      latestFullData.transactions = latestFullData.transactions.map((tx) => tx.id === id ? updated : tx);
+      if (existing?.studentId && existing.studentId !== updated.studentId) {
+        await safelySyncParentViewForStudent(existing.studentId);
+      }
+      if (updated.studentId) await safelySyncParentViewForStudent(updated.studentId);
       return {
         success: true,
-        transaction: { ...payload, id } as PointTransaction,
+        transaction: updated,
         message: 'Đã cập nhật mục thi đua.',
       };
     } catch (err) {
@@ -926,7 +1033,10 @@ export const api = {
 
   deleteTransaction: async (id: string): Promise<{ success: boolean; message: string }> => {
     try {
+      const existing = latestFullData.transactions.find((tx) => tx.id === id);
       await deleteDoc(doc(transactionsColRef, id));
+      latestFullData.transactions = latestFullData.transactions.filter((tx) => tx.id !== id);
+      if (existing?.studentId) await safelySyncParentViewForStudent(existing.studentId);
       return { success: true, message: 'Đã xóa mục thi đua thành công.' };
     } catch (err) {
       handleFirestoreError(err, OperationType.DELETE, `transactions/${id}`);
@@ -952,7 +1062,7 @@ export const api = {
       const studentId = `STU_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
       const currentStudents = latestFullData.students;
       const orderNumber = currentStudents.length > 0 ? Math.max(...currentStudents.map((s) => s.orderNumber || 0)) + 1 : 1;
-      const parentCode = studentData.parentCode || `PH11B6-${orderNumber < 10 ? '0' + orderNumber : orderNumber}`;
+      const parentCode = normalizeParentCode(studentData.parentCode || '') || generateParentCode();
 
       // 1. Public student doc (No sensitive contact info or parent codes)
       const publicStudent: PublicStudent = {
@@ -978,10 +1088,18 @@ export const api = {
       const batch = writeBatch(db);
       batch.set(doc(studentsColRef, studentId), publicStudent);
       batch.set(doc(privateStudentColRef, studentId), privateData);
+      batch.set(doc(parentViewLinksColRef, studentId), {
+        classId: activeClassId,
+        studentId,
+        code: parentCode,
+        updatedAt: new Date().toISOString(),
+      });
+      batch.set(doc(parentViewsColRef, parentCode), withoutUndefined(makeParentView(publicStudent) as unknown as Record<string, unknown>));
       await batch.commit();
 
       // Update cache
       privateStudentCache.set(studentId, privateData);
+      latestFullData.students = [...latestFullData.students, { ...publicStudent, ...privateData }];
 
       return {
         success: true,
@@ -1007,6 +1125,8 @@ export const api = {
     try {
       const id = typeof idOrData === 'string' ? idOrData : idOrData.id;
       const studentData = typeof idOrData === 'string' ? (maybeData || {}) : idOrData;
+      const existingStudent = latestFullData.students.find((student) => student.id === id);
+      const oldCode = normalizeParentCode(String(privateStudentCache.get(id)?.parentCode || ''));
 
       const batch = writeBatch(db);
 
@@ -1027,7 +1147,10 @@ export const api = {
       if (studentData.phone !== undefined) privateUpdates.phone = studentData.phone;
       if (studentData.parentPhone !== undefined) privateUpdates.parentPhone = studentData.parentPhone;
       if (studentData.parentName !== undefined) privateUpdates.parentName = studentData.parentName;
-      if (studentData.parentCode !== undefined) privateUpdates.parentCode = studentData.parentCode;
+      const requestedCode = studentData.parentCode !== undefined
+        ? (normalizeParentCode(studentData.parentCode) || generateParentCode())
+        : undefined;
+      if (requestedCode !== undefined) privateUpdates.parentCode = requestedCode;
       if (studentData.notes !== undefined) privateUpdates.notes = studentData.notes;
 
       if (Object.keys(privateUpdates).length > 0) {
@@ -1039,7 +1162,26 @@ export const api = {
         privateStudentCache.set(id, { ...existingPrivate, ...privateUpdates });
       }
 
+      const nextStudent = {
+        ...(existingStudent || { id }),
+        ...publicUpdates,
+        ...privateUpdates,
+        id,
+      } as Student;
+      if (requestedCode) {
+        batch.set(doc(parentViewLinksColRef, id), {
+          classId: activeClassId,
+          studentId: id,
+          code: requestedCode,
+          updatedAt: new Date().toISOString(),
+        });
+        batch.set(doc(parentViewsColRef, requestedCode), withoutUndefined(makeParentView(nextStudent) as unknown as Record<string, unknown>));
+        if (oldCode && oldCode !== requestedCode) batch.delete(doc(parentViewsColRef, oldCode));
+      }
+
       await batch.commit();
+      latestFullData.students = latestFullData.students.map((student) => student.id === id ? nextStudent : student);
+      await safelySyncParentViewForStudent(id, requestedCode);
 
       return {
         success: true,
@@ -1053,11 +1195,17 @@ export const api = {
 
   deleteStudent: async (id: string): Promise<{ success: boolean; message: string }> => {
     try {
+      const linkedCode = await findParentCodeForStudent(id);
+      const cachedCode = normalizeParentCode(String(privateStudentCache.get(id)?.parentCode || ''));
       const batch = writeBatch(db);
       batch.delete(doc(studentsColRef, id));
       batch.delete(doc(privateStudentColRef, id));
+      batch.delete(doc(parentViewLinksColRef, id));
+      if (linkedCode || cachedCode) batch.delete(doc(parentViewsColRef, linkedCode || cachedCode));
       await batch.commit();
       privateStudentCache.delete(id);
+      latestFullData.students = latestFullData.students.filter((student) => student.id !== id);
+      latestFullData.transactions = latestFullData.transactions.filter((tx) => tx.studentId !== id);
       return { success: true, message: 'Đã xóa học sinh khỏi danh sách lớp.' };
     } catch (err) {
       handleFirestoreError(err, OperationType.DELETE, `students/${id}`);
@@ -1123,7 +1271,7 @@ export const api = {
       parsedList.forEach((s, idx) => {
         const studentId = `STU_${Date.now()}_${idx + 1}`;
         const orderNum = s.orderNumber || idx + 1;
-        const parentCode = s.parentCode || `PH11B6-${orderNum < 10 ? '0' + orderNum : orderNum}`;
+        const parentCode = normalizeParentCode(s.parentCode || '') || generateParentCode();
 
         const publicData: PublicStudent = {
           id: studentId,
@@ -1146,8 +1294,16 @@ export const api = {
 
         batch.set(doc(studentsColRef, studentId), publicData);
         batch.set(doc(privateStudentColRef, studentId), privateData);
+        batch.set(doc(parentViewLinksColRef, studentId), {
+          classId: activeClassId,
+          studentId,
+          code: parentCode,
+          updatedAt: new Date().toISOString(),
+        });
+        batch.set(doc(parentViewsColRef, parentCode), withoutUndefined(makeParentView(publicData) as unknown as Record<string, unknown>));
 
         privateStudentCache.set(studentId, privateData);
+        latestFullData.students.push({ ...publicData, ...privateData });
       });
 
       await batch.commit();
@@ -1165,21 +1321,29 @@ export const api = {
     try {
       const batch = writeBatch(db);
       latestFullData.students.forEach((s) => {
-        const order = s.orderNumber || 1;
-        const newCode = `PH11B6-${order < 10 ? '0' + order : order}`;
+        const oldCode = normalizeParentCode(String(privateStudentCache.get(s.id)?.parentCode || ''));
+        const newCode = generateParentCode();
         // Strictly NEVER write parentCode to studentsColRef
         batch.set(
           doc(privateStudentColRef, s.id),
           { parentCode: newCode, updatedAt: new Date().toISOString() },
           { merge: true }
         );
+        batch.set(doc(parentViewLinksColRef, s.id), {
+          classId: activeClassId,
+          studentId: s.id,
+          code: newCode,
+          updatedAt: new Date().toISOString(),
+        });
+        batch.set(doc(parentViewsColRef, newCode), withoutUndefined(makeParentView(s) as unknown as Record<string, unknown>));
+        if (oldCode && oldCode !== newCode) batch.delete(doc(parentViewsColRef, oldCode));
         const existing = privateStudentCache.get(s.id) || { id: s.id };
         privateStudentCache.set(s.id, { ...existing, parentCode: newCode });
       });
       await batch.commit();
       return {
         success: true,
-        message: 'Đã tái tạo mã phụ huynh chuẩn vào vùng dữ liệu riêng tư.',
+        message: 'Đã tạo mã phụ huynh ngẫu nhiên mới, cập nhật cổng tra cứu và vô hiệu hóa các mã cũ.',
       };
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, 'students');
@@ -1322,6 +1486,11 @@ export const api = {
         note: entry.note || '',
       };
       await setDoc(doc(timetableColRef, entryId), fullEntry);
+      latestFullData.timetable = [
+        ...latestFullData.timetable.filter((item) => item.id !== entryId),
+        fullEntry,
+      ];
+      await safelySyncAllParentViews();
       return { success: true, message: 'Đã lưu thời khóa biểu thành công.' };
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, 'timetable');
@@ -1331,6 +1500,8 @@ export const api = {
   deleteTimetableEntry: async (id: string): Promise<{ success: boolean; message: string }> => {
     try {
       await deleteDoc(doc(timetableColRef, id));
+      latestFullData.timetable = latestFullData.timetable.filter((item) => item.id !== id);
+      await safelySyncAllParentViews();
       return { success: true, message: 'Đã xóa tiết học.' };
     } catch (err) {
       handleFirestoreError(err, OperationType.DELETE, `timetable/${id}`);
@@ -1362,14 +1533,20 @@ export const api = {
       const batch = writeBatch(db);
       currentTimetable.forEach((entry) => {
         const newId = `TT_M${tgtM}_W${tgtW}_${entry.dayOfWeek}_${entry.session}_${entry.period}`;
-        batch.set(doc(timetableColRef, newId), {
+        const copiedEntry = {
           ...entry,
           id: newId,
           month: tgtM,
           week: tgtW,
-        });
+        };
+        batch.set(doc(timetableColRef, newId), copiedEntry);
+        latestFullData.timetable = [
+          ...latestFullData.timetable.filter((item) => item.id !== newId),
+          copiedEntry,
+        ];
       });
       await batch.commit();
+      await safelySyncAllParentViews();
       return { success: true, message: `Đã sao chép TKB sang Tuần ${tgtW}!` };
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, 'timetable');
@@ -1387,8 +1564,14 @@ export const api = {
       entries.forEach((entry) => {
         const id = entry.id || `TT_${entry.dayOfWeek}_${entry.session || 'morning'}_${entry.period}`;
         batch.set(doc(timetableColRef, id), { ...entry, id }, { merge: true });
+        const existing = latestFullData.timetable.find((item) => item.id === id);
+        latestFullData.timetable = [
+          ...latestFullData.timetable.filter((item) => item.id !== id),
+          { ...(existing || {}), ...entry, id } as TimetableEntry,
+        ];
       });
       await batch.commit();
+      await safelySyncAllParentViews();
       return { success: true, message: `Đã cập nhật ${entries.length} tiết học TKB.` };
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, 'timetable');
@@ -1412,6 +1595,11 @@ export const api = {
         createdAt: new Date().toISOString(),
       };
       await setDoc(doc(homeworkColRef, taskId), fullTask);
+      latestFullData.homeworkTasks = [
+        ...latestFullData.homeworkTasks.filter((item) => item.id !== taskId),
+        fullTask,
+      ];
+      await safelySyncAllParentViews();
       return { success: true, message: 'Đã lưu báo bài tập về nhà.' };
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, 'homeworkTasks');
@@ -1421,6 +1609,8 @@ export const api = {
   deleteHomeworkTask: async (id: string): Promise<{ success: boolean; message: string }> => {
     try {
       await deleteDoc(doc(homeworkColRef, id));
+      latestFullData.homeworkTasks = latestFullData.homeworkTasks.filter((item) => item.id !== id);
+      await safelySyncAllParentViews();
       return { success: true, message: 'Đã xóa nhiệm vụ báo bài.' };
     } catch (err) {
       handleFirestoreError(err, OperationType.DELETE, `homeworkTasks/${id}`);
@@ -1625,12 +1815,13 @@ export const api = {
     role: 'bcs';
   }): Promise<{ success: boolean; message: string }> => {
     try {
-      await setDoc(doc(authorizedUsersColRef, payload.uid), {
+      await setDoc(doc(membersColRef, payload.uid), {
         uid: payload.uid,
         email: payload.email,
         displayName: payload.displayName,
         role: payload.role,
-        grantedAt: new Date().toISOString(),
+        active: true,
+        joinedAt: new Date().toISOString(),
       });
       return { success: true, message: `Đã cấp quyền Ban Cán Sự cho tài khoản ${payload.email}.` };
     } catch (err) {
@@ -1640,7 +1831,7 @@ export const api = {
 
   removeAuthorizedUser: async (uid: string): Promise<{ success: boolean; message: string }> => {
     try {
-      await deleteDoc(doc(authorizedUsersColRef, uid));
+      await deleteDoc(doc(membersColRef, uid));
       return { success: true, message: 'Đã thu hồi quyền truy cập.' };
     } catch (err) {
       handleFirestoreError(err, OperationType.DELETE, `authorizedUsers/${uid}`);
