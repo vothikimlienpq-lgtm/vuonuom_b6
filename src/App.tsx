@@ -100,7 +100,15 @@ function MainAppContent() {
       setIsLoading(false);
       setIsSyncing(false);
     }
-  }, [error, parentLookupCode]);
+  }, [error, parentLookupCode, verifiedClassId]);
+
+  const handleClassVerified = (classId: string) => {
+    setData(null);
+    setSession(null);
+    setParentLookupCode(null);
+    setActiveTab('overview');
+    setVerifiedClassId(classId);
+  };
 
   const handleSelectWeek = (week: number) => {
     setSelectedWeek(week);
@@ -153,7 +161,7 @@ function MainAppContent() {
   };
 
   if (!verifiedClassId) {
-    return <ClassAccessGate onVerified={setVerifiedClassId} />;
+    return <ClassAccessGate onVerified={handleClassVerified} />;
   }
 
   if (!session || session.role === 'guest') {
@@ -175,10 +183,10 @@ function MainAppContent() {
           <Sprout className="w-10 h-10 text-amber-300" />
         </div>
         <h2 className="text-xl font-black text-[#064e3b] mt-4 tracking-tight">
-          Vườn Ươm 11B6 Kim Liên
+          Cổng quản lý {verifiedClassId.toUpperCase()}
         </h2>
         <p className="text-xs text-emerald-800 font-semibold mt-1 animate-pulse">
-          Đang khởi tạo và đồng bộ dữ liệu lớp học...
+          Đang mở đúng dữ liệu của lớp đã xác thực...
         </p>
       </div>
     );
@@ -324,7 +332,7 @@ function MainAppContent() {
             </div>
             <div>
               <div className="font-black text-sm text-white">
-                HỆ THỐNG QUẢN LÝ LỚP CHỦ NHIỆM {data?.config?.className || '11B6'} • {data?.config?.themeTitle || 'VƯỜN ƯƠM TRI THỨC'}
+                HỆ THỐNG QUẢN LÝ LỚP CHỦ NHIỆM {data?.config?.className || verifiedClassId.toUpperCase()} • {data?.config?.themeTitle || 'VƯỜN ƯƠM TRI THỨC'}
               </div>
               <div className="text-emerald-200/90 text-[11px] mt-0.5">
                 {data?.config?.schoolName || 'THCS & THPT Lê Lợi'} • Giáo viên chủ nhiệm: {data?.config?.teacherName || 'Cô Võ Thị Kim Liên'} • Niên khóa {data?.config?.academicYear || '2026 – 2027'}

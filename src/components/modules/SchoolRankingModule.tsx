@@ -100,7 +100,7 @@ export const SchoolRankingModule: React.FC<SchoolRankingModuleProps> = ({
             <span>Thứ Hạng Toàn Trường & Khối 11</span>
           </h2>
           <p className="text-emerald-100 text-xs sm:text-sm mt-1">
-            Ghi nhận và theo dõi vị trí thi đua của Lớp 11B6 theo kết quả công bố định kỳ của Đoàn trường.
+            Ghi nhận và theo dõi vị trí thi đua của Lớp {data.config.className} theo kết quả công bố định kỳ của Đoàn trường.
           </p>
         </div>
 

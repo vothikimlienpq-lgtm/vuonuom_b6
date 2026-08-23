@@ -24,7 +24,7 @@ import {
 import {
   db,
   auth,
-  CLASS_ID,
+  DEFAULT_CLASS_ID,
   isFirebaseConfigured,
   handleFirestoreError,
   OperationType,
@@ -53,7 +53,7 @@ import {
 } from '../types';
 
 // Root class document reference
-let activeClassId = CLASS_ID;
+let activeClassId = DEFAULT_CLASS_ID;
 let classDocRef = doc(db, 'classes', activeClassId);
 
 // Subcollection references
@@ -76,7 +76,14 @@ let parentViewLinksColRef = collection(db, 'classes', activeClassId, 'parentView
 const parentViewsColRef = collection(db, 'parentViews');
 
 const selectClass = (classId: string) => {
-  activeClassId = normalizeLoginName(classId);
+  const normalizedClassId = normalizeLoginName(classId);
+  if (!normalizedClassId) throw new Error('Class ID không hợp lệ.');
+
+  // A class switch is a hard security boundary. Stop every listener and erase
+  // all cached records before binding Firestore references to the next class.
+  disposeClassListeners();
+  classContextVersion += 1;
+  activeClassId = normalizedClassId;
   classDocRef = doc(db, 'classes', activeClassId);
   studentsColRef = collection(db, 'classes', activeClassId, 'students');
   privateStudentColRef = collection(db, 'classes', activeClassId, 'privateStudentData');
@@ -94,6 +101,9 @@ const selectClass = (classId: string) => {
   auditLogsColRef = collection(db, 'classes', activeClassId, 'auditLogs');
   membersColRef = collection(db, 'classes', activeClassId, 'members');
   parentViewLinksColRef = collection(db, 'classes', activeClassId, 'parentViewLinks');
+  privateStudentCache.clear();
+  latestFullData = createEmptyClassData(activeClassId);
+  return activeClassId;
 };
 
 const normalizeLoginName = (value: string) => value
@@ -103,7 +113,7 @@ const normalizeLoginName = (value: string) => value
   .replace(/[\u0300-\u036f]/g, '')
   .replace(/[^a-z0-9._-]/g, '');
 
-const internalEmail = (username: string, classId = CLASS_ID) =>
+const internalEmail = (username: string, classId = activeClassId || DEFAULT_CLASS_ID) =>
   `${normalizeLoginName(username)}.${normalizeLoginName(classId)}@lop.local`;
 
 const withoutUndefined = <T extends Record<string, unknown>>(value: T): T =>
@@ -170,6 +180,7 @@ const fullDataFromParentView = (view: ParentViewDocument): FullClassData => ({
 const sessionFromParentView = (view: ParentViewDocument): UserSession => ({
   role: 'parent',
   username: `Phụ huynh em ${view.student.fullName}`,
+  classId: view.classId,
   studentId: view.studentId,
   studentName: view.student.fullName,
   groupNumber: view.student.groupNumber,
@@ -244,6 +255,8 @@ async function sessionFromMember(user: User): Promise<UserSession> {
   return {
     role,
     username: member.displayName || user.email || 'Thành viên lớp',
+    email: user.email || undefined,
+    classId: activeClassId,
     studentId: member.studentId || undefined,
     studentName: member.studentName || undefined,
     groupNumber: member.groupNumber || undefined,
@@ -251,37 +264,70 @@ async function sessionFromMember(user: User): Promise<UserSession> {
   };
 }
 
-// Default initial config
-export const DEFAULT_INITIAL_CONFIG: ClassConfig = {
-  id: CLASS_ID,
+const DEFAULT_SUBJECTS = [
+  'Toán', 'Ngữ Văn', 'Tiếng Anh', 'Vật Lý', 'Hóa Học', 'Sinh Học',
+  'Lịch Sử', 'Địa Lý', 'GDCD', 'Tin Học', 'Công Nghệ', 'Thể Dục',
+  'HĐTN-HN', 'Chào cờ', 'Sinh hoạt lớp',
+];
+
+const DEFAULT_CLEANING_TASKS = [
+  'Quét lớp & hành lang',
+  'Lau sàn & lau bảng',
+  'Kê ngay ngắn bàn ghế',
+  'Đổ rác & thay túi mới',
+  'Kiểm tra cửa sổ, quạt & đèn',
+  'Tưới cây góc xanh',
+];
+
+const classLabelFromId = (classId: string) =>
+  (normalizeLoginName(classId).split('-')[0] || 'lop-hoc').toUpperCase();
+
+const academicYearFromId = (classId: string) => {
+  const match = normalizeLoginName(classId).match(/(20\d{2})-(20\d{2})$/);
+  return match ? `${match[1]} – ${match[2]}` : 'Chưa cập nhật';
+};
+
+export const createInitialClassConfig = (
+  classId: string,
+  overrides: Partial<ClassConfig> = {}
+): ClassConfig => {
+  const normalizedClassId = normalizeLoginName(classId) || DEFAULT_CLASS_ID;
+  const className = classLabelFromId(normalizedClassId);
+  return {
+    initialized: false,
+    className,
+    schoolName: 'Chưa cập nhật',
+    academicYear: academicYearFromId(normalizedClassId),
+    teacherName: 'Chưa cập nhật',
+    themeTitle: `Vườn Ươm ${className}`,
+    slogan: 'Mỗi tuần một bước tiến – Cùng nhau vun đắp',
+    week1StartDate: new Date().toISOString().slice(0, 10),
+    totalWeeks: 38,
+    activeMonth: new Date().getMonth() + 1,
+    activeWeek: 1,
+    periodsPerDay: 8,
+    morningPeriods: 5,
+    afternoonPeriods: 3,
+    scheduleStructure: 'standard8',
+    subjects: [...DEFAULT_SUBJECTS],
+    cleaningTasks: [...DEFAULT_CLEANING_TASKS],
+    ...overrides,
+    id: normalizedClassId,
+  };
+};
+
+// Giữ nguyên cấu hình lớp đang vận hành để bản nâng cấp không làm đổi dữ liệu 11B6.
+export const DEFAULT_INITIAL_CONFIG: ClassConfig = createInitialClassConfig(DEFAULT_CLASS_ID, {
+  initialized: true,
   className: '11B6',
   schoolName: 'Trường THCS & THPT Lê Lợi',
   academicYear: '2026 – 2027',
   teacherName: 'Cô Võ Thị Kim Liên',
   themeTitle: 'Vườn Ươm 11B6 - Nơi Ươm Mầm Tri Thức & Nhân Cách',
-  slogan: 'Mỗi tuần một bước tiến – Cùng nhau vun đắp',
   week1StartDate: '2026-08-03',
-  totalWeeks: 38,
   activeMonth: 8,
   activeWeek: 3,
-  periodsPerDay: 8,
-  morningPeriods: 5,
-  afternoonPeriods: 3,
-  scheduleStructure: 'standard8',
-  subjects: [
-    'Toán', 'Ngữ Văn', 'Tiếng Anh', 'Vật Lý', 'Hóa Học', 'Sinh Học',
-    'Lịch Sử', 'Địa Lý', 'GDCD', 'Tin Học', 'Công Nghệ', 'Thể Dục',
-    'HĐTN-HN', 'Chào cờ', 'Sinh hoạt lớp'
-  ],
-  cleaningTasks: [
-    'Quét lớp & hành lang',
-    'Lau sàn & lau bảng',
-    'Kê ngay ngắn bàn ghế',
-    'Đổ rác & thay túi mới',
-    'Kiểm tra cửa sổ, quạt & đèn',
-    'Tưới cây góc xanh'
-  ],
-};
+});
 
 // Default standard 30 point rules
 export const DEFAULT_RULES: PointRule[] = [
@@ -320,11 +366,12 @@ export const DEFAULT_RULES: PointRule[] = [
   { id: 'R_MINUS_19', type: 'minus', content: 'Yêu cầu viết bản kiểm điểm', defaultPoints: 0, category: 'conduct', requiresReason: true, isActive: true },
 ];
 
-// In-memory cache for instant real-time sync
-let latestFullData: FullClassData = {
-  config: DEFAULT_INITIAL_CONFIG,
+const createEmptyClassData = (classId: string): FullClassData => ({
+  config: classId === DEFAULT_CLASS_ID
+    ? { ...DEFAULT_INITIAL_CONFIG, subjects: [...DEFAULT_INITIAL_CONFIG.subjects], cleaningTasks: [...DEFAULT_INITIAL_CONFIG.cleaningTasks] }
+    : createInitialClassConfig(classId),
   students: [],
-  rules: DEFAULT_RULES,
+  rules: DEFAULT_RULES.map((rule) => ({ ...rule })),
   transactions: [],
   dayLocks: [],
   weekLocks: [],
@@ -335,12 +382,22 @@ let latestFullData: FullClassData = {
   cleaningDuties: [],
   reminders: [],
   cleaningAssignments: [],
-};
+});
+
+let classContextVersion = 0;
+
+// In-memory cache is scoped to the currently verified class.
+let latestFullData: FullClassData = createEmptyClassData(activeClassId);
 
 // Listeners tracking
 const activeUnsubscribes: Unsubscribe[] = [];
 const authDependentUnsubscribes: Unsubscribe[] = [];
 const privateStudentCache = new Map<string, PrivateStudentData>();
+
+function disposeClassListeners() {
+  activeUnsubscribes.splice(0).forEach((unsubscribe) => unsubscribe());
+  authDependentUnsubscribes.splice(0).forEach((unsubscribe) => unsubscribe());
+}
 
 export const api = {
   // -------------------------------------------------------------
@@ -415,14 +472,14 @@ export const api = {
   verifyClassAccess: async (payload: {
     classId: string;
     password: string;
-  }): Promise<{ success: boolean; message: string }> => {
+  }): Promise<{ success: boolean; message: string; classId: string }> => {
     const classId = normalizeLoginName(payload.classId);
     if (!classId || !payload.password) throw new Error('Vui lòng nhập Class ID và mật khẩu lớp.');
     try {
       await signInWithEmailAndPassword(auth, `${classId}@lop.local`, payload.password);
       await signOut(auth);
       selectClass(classId);
-      return { success: true, message: 'Đã xác thực Class ID.' };
+      return { success: true, message: 'Đã xác thực Class ID.', classId };
     } catch (err: any) {
       if (auth.currentUser) await signOut(auth).catch(() => undefined);
       if (err.code === 'auth/too-many-requests') throw new Error('Nhập sai quá nhiều lần. Vui lòng thử lại sau.');
@@ -476,7 +533,15 @@ export const api = {
     } catch {
       // Ignore
     }
+    disposeClassListeners();
+    classContextVersion += 1;
+    privateStudentCache.clear();
+    latestFullData = createEmptyClassData(activeClassId);
   },
+
+  getActiveClassId: () => activeClassId,
+
+  getCurrentAuthEmail: () => auth.currentUser?.email || '',
 
   getCurrentSession: async (): Promise<UserSession> => {
     const currentUser = auth.currentUser;
@@ -533,12 +598,16 @@ export const api = {
       return () => {};
     }
 
-    // Clean previous subscriptions if any
-    activeUnsubscribes.forEach((unsub) => unsub());
-    activeUnsubscribes.length = 0;
+    disposeClassListeners();
+    const subscribedClassId = activeClassId;
+    const subscriptionVersion = classContextVersion;
+    const contextData = createEmptyClassData(subscribedClassId);
+    latestFullData = contextData;
 
     const notifyUpdate = () => {
-      callback({ ...latestFullData });
+      if (subscriptionVersion !== classContextVersion || subscribedClassId !== activeClassId) return;
+      latestFullData = contextData;
+      callback({ ...contextData });
     };
 
     try {
@@ -547,13 +616,14 @@ export const api = {
         classDocRef,
         (snap) => {
           if (snap.exists()) {
-            latestFullData.config = {
-              ...DEFAULT_INITIAL_CONFIG,
+            contextData.config = {
+              ...createInitialClassConfig(subscribedClassId),
               ...snap.data(),
               id: snap.id,
+              initialized: true,
             } as ClassConfig;
           } else {
-            latestFullData.config = DEFAULT_INITIAL_CONFIG;
+            contextData.config = createInitialClassConfig(subscribedClassId);
           }
           notifyUpdate();
         },
@@ -568,7 +638,7 @@ export const api = {
         (snap) => {
           const publicStudents = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as PublicStudent[];
 
-          latestFullData.students = publicStudents.map((ps) => {
+          contextData.students = publicStudents.map((ps) => {
             const privateInfo = privateStudentCache.get(ps.id);
             return {
               ...ps,
@@ -586,12 +656,12 @@ export const api = {
         rulesColRef,
         (snap) => {
           if (!snap.empty) {
-            latestFullData.rules = snap.docs.map((d) => ({
+            contextData.rules = snap.docs.map((d) => ({
               id: d.id,
               ...d.data(),
             })) as PointRule[];
           } else {
-            latestFullData.rules = DEFAULT_RULES;
+            contextData.rules = DEFAULT_RULES.map((rule) => ({ ...rule }));
           }
           notifyUpdate();
         },
@@ -601,12 +671,14 @@ export const api = {
 
       // 4. Authenticated Subscriptions: Point Transactions & Private Student Data
       const unsubAuth = onAuthStateChanged(auth, async (currentUser) => {
+        if (subscriptionVersion !== classContextVersion || subscribedClassId !== activeClassId) return;
         // Clean previous auth-dependent subscriptions
         authDependentUnsubscribes.forEach((u) => u());
         authDependentUnsubscribes.length = 0;
 
         if (currentUser) {
           const memberDoc = await getDoc(doc(membersColRef, currentUser.uid));
+          if (subscriptionVersion !== classContextVersion || subscribedClassId !== activeClassId) return;
           const member = memberDoc.exists() ? memberDoc.data() : null;
           const isAuthorized = member?.active === true;
           const isTeacher = member?.role === 'teacher' || member?.role === 'gvcn';
@@ -619,7 +691,7 @@ export const api = {
             const unsubTx = onSnapshot(
               txSource,
               (snap) => {
-                latestFullData.transactions = snap.docs.map((d) => ({
+                contextData.transactions = snap.docs.map((d) => ({
                   id: d.id,
                   ...d.data(),
                 })) as PointTransaction[];
@@ -627,13 +699,13 @@ export const api = {
               },
               (err) => {
                 console.warn('Transactions snapshot error:', err);
-                latestFullData.transactions = [];
+                contextData.transactions = [];
                 notifyUpdate();
               }
             );
             authDependentUnsubscribes.push(unsubTx);
           } else {
-            latestFullData.transactions = [];
+            contextData.transactions = [];
             notifyUpdate();
           }
 
@@ -648,7 +720,7 @@ export const api = {
                 });
 
                 // Merge private fields into students list
-                latestFullData.students = latestFullData.students.map((s) => {
+                contextData.students = contextData.students.map((s) => {
                   const priv = privateStudentCache.get(s.id);
                   return {
                     ...s,
@@ -664,7 +736,7 @@ export const api = {
             authDependentUnsubscribes.push(unsubPrivate);
           } else {
             privateStudentCache.clear();
-            latestFullData.students = latestFullData.students.map((s) => ({
+            contextData.students = contextData.students.map((s) => ({
               id: s.id,
               orderNumber: s.orderNumber,
               fullName: s.fullName,
@@ -677,8 +749,8 @@ export const api = {
         } else {
           // Guest mode: clear transactions and strip private student fields
           privateStudentCache.clear();
-          latestFullData.transactions = [];
-          latestFullData.students = latestFullData.students.map((s) => ({
+          contextData.transactions = [];
+          contextData.students = contextData.students.map((s) => ({
             id: s.id,
             orderNumber: s.orderNumber,
             fullName: s.fullName,
@@ -695,7 +767,7 @@ export const api = {
       const unsubDayLocks = onSnapshot(
         dayLocksColRef,
         (snap) => {
-          latestFullData.dayLocks = snap.docs.map((d) => ({
+          contextData.dayLocks = snap.docs.map((d) => ({
             id: d.id,
             ...d.data(),
           })) as DayLock[];
@@ -709,7 +781,7 @@ export const api = {
       const unsubWeekLocks = onSnapshot(
         weekLocksColRef,
         (snap) => {
-          latestFullData.weekLocks = snap.docs.map((d) => ({
+          contextData.weekLocks = snap.docs.map((d) => ({
             id: d.id,
             ...d.data(),
           })) as WeekLock[];
@@ -723,7 +795,7 @@ export const api = {
       const unsubBonuses = onSnapshot(
         groupBonusesColRef,
         (snap) => {
-          latestFullData.groupBonuses = snap.docs.map((d) => ({
+          contextData.groupBonuses = snap.docs.map((d) => ({
             id: d.id,
             ...d.data(),
           })) as GroupBonus[];
@@ -737,7 +809,7 @@ export const api = {
       const unsubRankings = onSnapshot(
         schoolRankingsColRef,
         (snap) => {
-          latestFullData.schoolRankings = snap.docs.map((d) => ({
+          contextData.schoolRankings = snap.docs.map((d) => ({
             id: d.id,
             ...d.data(),
           })) as SchoolRankRecord[];
@@ -751,7 +823,7 @@ export const api = {
       const unsubTimetable = onSnapshot(
         timetableColRef,
         (snap) => {
-          latestFullData.timetable = snap.docs.map((d) => ({
+          contextData.timetable = snap.docs.map((d) => ({
             id: d.id,
             ...d.data(),
           })) as TimetableEntry[];
@@ -765,7 +837,7 @@ export const api = {
       const unsubHomework = onSnapshot(
         homeworkColRef,
         (snap) => {
-          latestFullData.homeworkTasks = snap.docs.map((d) => ({
+          contextData.homeworkTasks = snap.docs.map((d) => ({
             id: d.id,
             ...d.data(),
           })) as HomeworkTask[];
@@ -779,7 +851,7 @@ export const api = {
       const unsubDuties = onSnapshot(
         cleaningDutiesColRef,
         (snap) => {
-          latestFullData.cleaningDuties = snap.docs.map((d) => ({
+          contextData.cleaningDuties = snap.docs.map((d) => ({
             id: d.id,
             ...d.data(),
           })) as CleaningDutyEntry[];
@@ -793,7 +865,7 @@ export const api = {
       const unsubReminders = onSnapshot(
         remindersColRef,
         (snap) => {
-          latestFullData.reminders = snap.docs.map((d) => ({
+          contextData.reminders = snap.docs.map((d) => ({
             ...d.data(),
           })) as WeeklyReminder[];
           notifyUpdate();
@@ -806,7 +878,7 @@ export const api = {
       const unsubAssignments = onSnapshot(
         cleaningAssignmentsColRef,
         (snap) => {
-          latestFullData.cleaningAssignments = snap.docs.map((d) => ({
+          contextData.cleaningAssignments = snap.docs.map((d) => ({
             id: d.id,
             ...d.data(),
           })) as CleaningAssignment[];
@@ -821,8 +893,7 @@ export const api = {
     }
 
     return () => {
-      activeUnsubscribes.forEach((unsub) => unsub());
-      activeUnsubscribes.length = 0;
+      if (subscriptionVersion === classContextVersion) disposeClassListeners();
     };
   },
 
@@ -838,12 +909,16 @@ export const api = {
   // ONE-CLICK DATABASE INITIALIZATION (SEEDING)
   // -------------------------------------------------------------
 
-  initializeClassData: async (): Promise<{ success: boolean; message: string }> => {
+  initializeClassData: async (initialConfig: Partial<ClassConfig> = {}): Promise<{ success: boolean; message: string }> => {
     try {
       const batch = writeBatch(db);
+      const config = createInitialClassConfig(activeClassId, {
+        ...initialConfig,
+        initialized: true,
+      });
 
       // 1. Set Class Config
-      batch.set(classDocRef, DEFAULT_INITIAL_CONFIG, { merge: true });
+      batch.set(classDocRef, config, { merge: true });
 
       // 2. Set Standard 30 Rules
       DEFAULT_RULES.forEach((rule) => {
@@ -855,10 +930,10 @@ export const api = {
 
       return {
         success: true,
-        message: 'Khởi tạo cấu hình và 30 quy chế thi đua Lớp 11B6 lên Cloud Firestore thành công!',
+        message: `Khởi tạo cấu hình và 30 quy chế thi đua lớp ${config.className} thành công!`,
       };
     } catch (err) {
-      handleFirestoreError(err, OperationType.WRITE, 'classes/11b6-2026-2027');
+      handleFirestoreError(err, OperationType.WRITE, `classes/${activeClassId}`);
     }
   },
 
@@ -868,12 +943,13 @@ export const api = {
 
   updateClassConfig: async (config: Partial<ClassConfig>): Promise<{ success: boolean; message: string }> => {
     try {
-      await setDoc(classDocRef, config, { merge: true });
-      latestFullData.config = { ...latestFullData.config, ...config };
+      const safeConfig = { ...config, id: activeClassId, initialized: true };
+      await setDoc(classDocRef, safeConfig, { merge: true });
+      latestFullData.config = { ...latestFullData.config, ...safeConfig };
       await safelySyncAllParentViews();
       return { success: true, message: 'Cập nhật cấu hình lớp học thành công!' };
     } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, 'classes/11b6-2026-2027');
+      handleFirestoreError(err, OperationType.UPDATE, `classes/${activeClassId}`);
     }
   },
 

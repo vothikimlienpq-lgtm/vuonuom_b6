@@ -24,14 +24,7 @@ export const ParentReportPrintModal: React.FC<ParentReportPrintModalProps> = ({
 
   const allStudents = data.students || [];
   const allTransactions = data.transactions || [];
-  const config = data.config || {
-    className: '11B6',
-    schoolName: 'THPT Kim Liên',
-    academicYear: '2024 - 2025',
-    teacherName: 'Võ Thị Kim Liên',
-    slogan: 'Kỷ luật - Yêu thương - Tự giác - Tỏa sáng',
-    subjects: ['Toán', 'Văn', 'Anh', 'Lý', 'Hóa', 'Sinh', 'Sử', 'Địa', 'GDCD', 'Tin', 'Công nghệ', 'GDTC'],
-  };
+  const config = data.config;
 
   const studentSummaries = computeStudentScores(allStudents, allTransactions, selectedMonth);
 
@@ -85,10 +78,10 @@ export const ParentReportPrintModal: React.FC<ParentReportPrintModalProps> = ({
                     SỞ GIÁO DỤC VÀ ĐÀO TẠO TP. HÀ NỘI
                   </div>
                   <div className="text-sm font-black uppercase text-[#064e3b]">
-                    {config.schoolName || 'TRƯỜNG THPT KIM LIÊN'}
+                    {config.schoolName || 'CHƯA CẬP NHẬT TRƯỜNG'}
                   </div>
                   <div className="text-[11px] font-semibold text-slate-500">
-                    LỚP: {config.className || '11B6'} • NĂM HỌC {config.academicYear || '2025 - 2026'}
+                    LỚP: {config.className || config.id.toUpperCase()} • NĂM HỌC {config.academicYear || 'CHƯA CẬP NHẬT'}
                   </div>
                 </div>
 

@@ -4,6 +4,7 @@ export type DayOfWeek = 'Thứ 2' | 'Thứ 3' | 'Thứ 4' | 'Thứ 5' | 'Thứ 6
 
 export interface ClassConfig {
   id: string;
+  initialized?: boolean;
   className: string;
   schoolName: string;
   academicYear: string;
@@ -206,6 +207,8 @@ export interface CleaningAssignment {
 export interface UserSession {
   role: UserRole;
   username: string;
+  email?: string;
+  classId?: string;
   studentId?: string;
   studentName?: string;
   groupNumber?: number;

@@ -110,7 +110,7 @@ export const IndividualConductModule: React.FC<IndividualConductModuleProps> = (
               <span>Hồ Sơ Rèn Luyện: Em {student.fullName}</span>
             </h2>
             <p className="text-emerald-100 text-xs sm:text-sm mt-1.5 font-medium">
-              Lớp {data.config?.className || '11B6'} • STT: {student.orderNumber} • Tổ {student.groupNumber} • GVCN: {data.config?.teacherName || 'Cô Võ Thị Kim Liên'}
+              Lớp {data.config.className} • STT: {student.orderNumber} • Tổ {student.groupNumber} • GVCN: {data.config.teacherName || 'Chưa cập nhật'}
             </p>
           </div>
 

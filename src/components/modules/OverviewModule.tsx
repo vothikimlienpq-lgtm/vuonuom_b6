@@ -80,7 +80,7 @@ export const OverviewModule: React.FC<OverviewModuleProps> = ({
             </div>
 
             <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-              Bảng Tổng Quan Thi Đua Lớp 11B6
+              Bảng Tổng Quan Thi Đua Lớp {data.config.className}
             </h2>
             <p className="text-emerald-100/90 text-sm mt-1 max-w-2xl">
               Theo dõi toàn diện điểm rèn luyện, thi đua giữa các tổ, nề nếp kỷ luật và nhiệm vụ học tập tuần này.
@@ -280,7 +280,7 @@ export const OverviewModule: React.FC<OverviewModuleProps> = ({
           {attentionStudents.length === 0 ? (
             <div className="text-center py-10 text-slate-500 text-sm">
               <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
-              Lớp 11B6 đang duy trì nề nếp rèn luyện rất tốt!
+              Lớp {data.config.className} đang duy trì nề nếp rèn luyện rất tốt!
             </div>
           ) : (
             <div className="space-y-2.5">

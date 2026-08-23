@@ -172,12 +172,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                     required
                     autoComplete="off"
                     spellCheck={false}
-                    placeholder="Ví dụ: PH11B6-ABCD-2345"
+                    placeholder="Ví dụ: PH10A1-ABCD-2345"
                     className="w-full rounded-2xl border border-slate-300 py-3 pl-12 pr-4 font-black uppercase tracking-wider focus:outline-none focus:ring-2 focus:ring-emerald-700"
                   />
                 </span>
                 <span className="mt-2 block text-xs font-normal leading-relaxed text-slate-500">
-                  Dùng mã ngẫu nhiên mới do GVCN cấp. Mã ngắn kiểu cũ như PH11B6-27 không còn đủ an toàn.
+                  Dùng mã ngẫu nhiên mới do GVCN cấp. Mã ngắn đánh số tuần tự kiểu cũ không còn đủ an toàn.
                 </span>
               </label>
             ) : (

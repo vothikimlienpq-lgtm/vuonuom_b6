@@ -62,12 +62,7 @@ export const CleaningDutyModule: React.FC<CleaningDutyModuleProps> = ({
   const { success, error, warning } = useToast();
   const canEdit = userRole === 'gvcn' || userRole === 'bcs';
 
-  const config = data.config || {
-    className: '11B6',
-    week1StartDate: '2026-08-03',
-    totalWeeks: 38,
-    cleaningTasks: DEFAULT_CATEGORY_ITEMS.map(c => c.name)
-  };
+  const config = data.config;
 
   const students = data.students || [];
   const cleaningAssignments = data.cleaningAssignments || [];
@@ -306,7 +301,7 @@ export const CleaningDutyModule: React.FC<CleaningDutyModuleProps> = ({
         {/* Top Badge */}
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400 text-emerald-950 font-black text-xs uppercase tracking-wide shadow-sm">
           <Calendar className="w-3.5 h-3.5 stroke-[2.5]" />
-          <span>NỀ NẾP LỚP {config.className || '11B6'}</span>
+          <span>NỀ NẾP LỚP {config.className || config.id.toUpperCase()}</span>
         </div>
 
         {/* Header Title & Subtitle */}

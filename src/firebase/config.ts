@@ -2,8 +2,10 @@ import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
 import { getFirestore, Firestore, doc, getDocFromServer } from 'firebase/firestore';
 
-export const CLASS_ID = '11b6-2026-2027';
-export const TEACHER_EMAIL = 'vothikimlien.pq@gmail.com';
+// This value only pre-fills the Class ID field for the existing deployment.
+// Runtime data access is always rebound to the Class ID verified by the user.
+export const DEFAULT_CLASS_ID = '11b6-2026-2027';
+export const CLASS_ID = DEFAULT_CLASS_ID;
 
 // Firebase configuration schema
 export interface CustomFirebaseConfig {
@@ -65,10 +67,10 @@ export const auth: Auth = getAuth(app);
 export const db: Firestore = getFirestore(app);
 
 // Test connection on boot
-export async function testFirestoreConnection(): Promise<boolean> {
+export async function testFirestoreConnection(classId = DEFAULT_CLASS_ID): Promise<boolean> {
   if (!isFirebaseConfigured()) return false;
   try {
-    await getDocFromServer(doc(db, 'classes', CLASS_ID));
+    await getDocFromServer(doc(db, 'classes', classId));
     return true;
   } catch (error) {
     if (error instanceof Error && error.message.includes('the client is offline')) {

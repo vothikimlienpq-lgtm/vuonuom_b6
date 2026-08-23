@@ -39,14 +39,7 @@ export const Header: React.FC<HeaderProps> = ({
   onRefreshData,
   isSyncing,
 }) => {
-  const safeConfig: ClassConfig = config || {
-    className: '11B6',
-    schoolName: 'THPT Kim Liên',
-    academicYear: '2024 - 2025',
-    teacherName: 'Võ Thị Kim Liên',
-    slogan: 'Kỷ luật - Yêu thương - Tự giác - Tỏa sáng',
-    subjects: ['Toán', 'Văn', 'Anh', 'Lý', 'Hóa', 'Sinh', 'Sử', 'Địa', 'GDCD', 'Tin', 'Công nghệ', 'GDTC'],
-  };
+  const safeConfig: ClassConfig = config;
 
   const [bcsCountdown, setBcsCountdown] = useState<number>(session?.bcsTimeRemaining || 1800);
 
@@ -108,7 +101,7 @@ export const Header: React.FC<HeaderProps> = ({
     return (
       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-800/80 text-emerald-200 border border-emerald-700">
         <UserCheck className="w-3.5 h-3.5 text-emerald-300" />
-        Thành viên Lớp 11B6
+        Thành viên Lớp {safeConfig.className}
       </span>
     );
   };
@@ -130,7 +123,7 @@ export const Header: React.FC<HeaderProps> = ({
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-lg sm:text-xl font-black tracking-tight text-white flex items-center gap-1.5">
-                  <span>{safeConfig.className || 'Lớp 11B6'}</span>
+                  <span>{safeConfig.className || safeConfig.id.toUpperCase()}</span>
                 </h1>
                 <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-800 text-emerald-200 border border-emerald-600/60">
                   {safeConfig.academicYear || '2026 - 2027'}
@@ -152,11 +145,11 @@ export const Header: React.FC<HeaderProps> = ({
 
               <div className="flex items-center gap-2 text-xs text-emerald-100/90 mt-0.5">
                 <span className="truncate">
-                  {safeConfig.schoolName || 'Trường THCS&THPT Lê Lợi'}
+                  {safeConfig.schoolName || 'Chưa cập nhật trường'}
                 </span>
                 <span>•</span>
                 <span className="text-amber-200 font-medium truncate">
-                  GVCN: {safeConfig.teacherName || 'Cô Kim Liên'}
+                  GVCN: {safeConfig.teacherName || 'Chưa cập nhật'}
                 </span>
               </div>
             </div>

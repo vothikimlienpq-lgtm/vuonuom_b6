@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Settings, 
   Lock, 
@@ -26,7 +26,6 @@ import {
 } from 'lucide-react';
 import { FullClassData, ClassConfig, PointRule, Student, UserRole } from '../../types';
 import { api } from '../../services/api';
-import { TEACHER_EMAIL } from '../../firebase/config';
 import { useToast } from '../Toast';
 
 interface ClassSettingsModuleProps {
@@ -44,31 +43,14 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
 }) => {
   const { success, error, warning } = useToast();
   const isGvcn = userRole === 'gvcn';
+  const teacherEmail = api.getCurrentAuthEmail() || 'Tài khoản GVCN đang đăng nhập';
 
   // Active Settings Tab
   const [activeTab, setActiveTab] = useState<'info' | 'rules' | 'students' | 'security' | 'backup'>('info');
 
   const students = data.students || [];
   const rules = data.rules || [];
-  const currentConfig: ClassConfig = data.config || {
-    id: 'class_11b6',
-    className: '11B6',
-    schoolName: 'THPT Kim Liên',
-    academicYear: '2026 – 2027',
-    teacherName: 'Cô Võ Thị Kim Liên',
-    themeTitle: 'Vườn Ươm 11B6 - Nơi Ươm Mầm Tri Thức & Nhân Cách',
-    slogan: 'Mỗi tuần một bước tiến – Cùng nhau vun đắp',
-    week1StartDate: '2026-08-03',
-    totalWeeks: 38,
-    activeMonth: 8,
-    activeWeek: 3,
-    periodsPerDay: 8,
-    morningPeriods: 5,
-    afternoonPeriods: 3,
-    scheduleStructure: 'standard8',
-    subjects: ['Toán', 'Ngữ văn', 'Tiếng Anh', 'Vật lý', 'Hóa học', 'Sinh học', 'Lịch sử', 'Địa lý', 'GDCD', 'Tin học', 'Công nghệ', 'GDTC', 'Hoạt động trải nghiệm', 'Chào cờ', 'Sinh hoạt lớp'],
-    cleaningTasks: ['Quét lớp & lau bảng', 'Lau hành lang & đổ rác', 'Kê bàn ghế & lau cửa kính', 'Tưới cây & góc xanh']
-  };
+  const currentConfig: ClassConfig = data.config;
 
   // Form states
   const [config, setConfig] = useState<ClassConfig>({
@@ -83,6 +65,10 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
     slogan: currentConfig.slogan || 'Mỗi tuần một bước tiến – Cùng nhau vun đắp',
   });
   const [savingConfig, setSavingConfig] = useState(false);
+
+  useEffect(() => {
+    setConfig({ ...data.config });
+  }, [data.config.id]);
 
   // Security Form states
   const [gvcnPass, setGvcnPass] = useState('');
@@ -312,10 +298,10 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
   // Firebase One-Time Class Initialization
   const [initializingFirebase, setInitializingFirebase] = useState(false);
   const handleInitializeFirebase = async () => {
-    if (!window.confirm('Khởi tạo cơ sở dữ liệu Lớp 11B6 chuẩn lên Cloud Firestore (Cấu hình năm học 2026–2027 và 30 quy chế điểm)?')) return;
+    if (!window.confirm(`Khởi tạo cơ sở dữ liệu riêng cho lớp ${config.className} (${config.id}) và 30 quy chế điểm?`)) return;
     setInitializingFirebase(true);
     try {
-      const res = await api.initializeClassData();
+      const res = await api.initializeClassData(config);
       if (res.success) {
         success(res.message);
         onRefresh();
@@ -443,7 +429,7 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
                       value={config.className}
                       onChange={(e) => setConfig({ ...config, className: e.target.value })}
                       required
-                      placeholder="Ví dụ: 11B6"
+                      placeholder="Ví dụ: 10A1"
                       className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 outline-none"
                     />
                   </div>
@@ -696,7 +682,7 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
                 </div>
                 <div>
                   <div className="font-black text-base leading-tight">
-                    Lớp {config.className || '11B6'}
+                    Lớp {config.className || config.id.toUpperCase()}
                   </div>
                   <div className="text-xs text-emerald-100 opacity-90">
                     {config.schoolName || 'THPT Kim Liên'} • GVCN: {config.teacherName || 'Cô Kim Liên'}
@@ -975,7 +961,7 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
           <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-100 text-xs space-y-1.5">
             <div className="flex items-center justify-between text-slate-700">
               <span className="font-bold">Email quản trị viên (GVCN):</span>
-              <span className="font-mono font-bold text-emerald-900 bg-white px-2 py-0.5 rounded border border-emerald-200">{TEACHER_EMAIL}</span>
+              <span className="font-mono font-bold text-emerald-900 bg-white px-2 py-0.5 rounded border border-emerald-200">{teacherEmail}</span>
             </div>
             <div className="flex items-center justify-between text-slate-700">
               <span className="font-bold">Trạng thái phiên đăng nhập:</span>
@@ -990,7 +976,7 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
             <form onSubmit={handleUpdatePasswords} className="space-y-4 max-w-md">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Đổi mật khẩu mới cho tài khoản GVCN ({TEACHER_EMAIL}):
+                  Đổi mật khẩu mới cho tài khoản GVCN ({teacherEmail}):
                 </label>
                 <input
                   type="password"
@@ -1033,11 +1019,11 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
             <div className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-amber-500" />
               <h3 className="text-base font-black text-emerald-950">
-                Khởi Tạo Dữ Liệu Lớp 11B6 Trên Cloud Firestore
+                Khởi Tạo Dữ Liệu Riêng Cho Lớp {config.className}
               </h3>
             </div>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Thiết lập cấu hình lớp mẫu (THCS & THPT Lê Lợi, Niên khóa 2026–2027) cùng 30 quy chế thi đua điểm cộng/trừ chuẩn vào cơ sở dữ liệu Firebase Firestore của bạn.
+              Tạo tài liệu <span className="font-mono">classes/{config.id}</span> cùng 30 quy chế thi đua. Dữ liệu của lớp này hoàn toàn tách biệt với các lớp khác dùng chung website.
             </p>
             <div className="pt-2 flex items-center justify-between">
               <span className="text-[11px] text-slate-500 font-medium">Chỉ cần thực hiện 1 lần duy nhất sau khi tạo Firestore.</span>
@@ -1167,7 +1153,7 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
               </div>
 
               <p className="text-[11px] text-slate-500 italic">
-                * Mã tra cứu phụ huynh sẽ được hệ thống cấp tự động theo cấu trúc bảo mật PH11B6-XX.
+                * Mã tra cứu phụ huynh được cấp tự động theo cấu trúc ngẫu nhiên PH{(config.className || 'LOP').replace(/[^A-Za-z0-9]/g, '').toUpperCase()}-XXXX-XXXX.
               </p>
 
               <div className="flex items-center justify-end gap-2 pt-3">

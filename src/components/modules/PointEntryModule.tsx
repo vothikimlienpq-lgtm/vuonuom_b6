@@ -66,11 +66,7 @@ export const PointEntryModule: React.FC<PointEntryModuleProps> = ({
 }) => {
   const { success, error, warning } = useToast();
 
-  const config = data.config || {
-    className: '11B6',
-    week1StartDate: '2026-08-03',
-    totalWeeks: 38
-  };
+  const config = data.config;
   const totalWeeks = Number(config.totalWeeks) || 38;
   const weekInfo = getWeekDateRange(config.week1StartDate, selectedWeek);
 

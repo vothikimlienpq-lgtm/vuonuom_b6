@@ -55,15 +55,7 @@ export const HomeworkScheduleModule: React.FC<HomeworkScheduleModuleProps> = ({
   const { success, error, warning } = useToast();
   const canEdit = userRole === 'gvcn' || userRole === 'bcs';
 
-  const config = data.config || {
-    className: '11B6',
-    week1StartDate: '2026-08-03',
-    totalWeeks: 38,
-    periodsPerDay: 8,
-    morningPeriods: 5,
-    afternoonPeriods: 3,
-    subjects: ['Toán', 'Ngữ văn', 'Tiếng Anh', 'Vật lý', 'Hóa học', 'Sinh học', 'Lịch sử', 'Địa lý', 'GDCD', 'Tin học', 'Công nghệ', 'GDTC', 'Hoạt động trải nghiệm', 'Chào cờ', 'Sinh hoạt lớp']
-  };
+  const config = data.config;
 
   const totalPeriods = Number(config.periodsPerDay) || 8;
   const morningCount = Number(config.morningPeriods) || 5;

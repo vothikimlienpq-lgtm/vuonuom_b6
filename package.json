@@ -1,7 +1,7 @@
 {
-  "name": "vuon-uom-11b6",
+  "name": "vuon-uom-da-lop",
   "private": true,
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",

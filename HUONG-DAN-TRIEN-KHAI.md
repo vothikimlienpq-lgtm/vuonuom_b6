@@ -1,6 +1,8 @@
-# TRIỂN KHAI VƯỜN ƯƠM 11B6 LÊN GITHUB PAGES VÀ FIREBASE
+# TRIỂN KHAI VƯỜN ƯƠM ĐA LỚP LÊN GITHUB PAGES VÀ FIREBASE
 
 Ứng dụng là website tĩnh React + TypeScript + Vite, dùng Firebase Authentication cho thành viên và Cloud Firestore để đồng bộ dữ liệu. Mọi người dùng xác thực Class ID trước; phụ huynh dùng mã riêng ở bước 2 và không cần tài khoản Firebase.
+
+Sau khi lớp đầu tiên hoạt động, xem `HUONG-DAN-CHE-DO-DA-LOP.md` để tạo thêm lớp và giáo viên mà không cần triển khai website mới.
 
 ## 1. Tạo Firebase Web App
 

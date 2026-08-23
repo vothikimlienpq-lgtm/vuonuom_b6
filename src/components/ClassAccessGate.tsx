@@ -7,14 +7,14 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { api } from '../services/api';
-import { CLASS_ID } from '../firebase/config';
+import { DEFAULT_CLASS_ID } from '../firebase/config';
 
 interface Props {
   onVerified: (classId: string) => void;
 }
 
 export const ClassAccessGate: React.FC<Props> = ({ onVerified }) => {
-  const [classId, setClassId] = useState(CLASS_ID);
+  const [classId, setClassId] = useState(DEFAULT_CLASS_ID);
   const [password, setPassword] = useState('');
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -25,8 +25,8 @@ export const ClassAccessGate: React.FC<Props> = ({ onVerified }) => {
     setMessage('');
     setLoading(true);
     try {
-      await api.verifyClassAccess({ classId, password });
-      onVerified(classId.trim().toLowerCase());
+      const result = await api.verifyClassAccess({ classId, password });
+      onVerified(result.classId);
     } catch (error: any) {
       setMessage(error.message || 'Class ID hoặc mật khẩu lớp không chính xác.');
     } finally {
@@ -65,7 +65,7 @@ export const ClassAccessGate: React.FC<Props> = ({ onVerified }) => {
                 required
                 autoComplete="off"
                 spellCheck={false}
-                placeholder="Ví dụ: 11b6"
+                placeholder="Ví dụ: 10a1-2026-2027"
                 className="w-full rounded-2xl border border-slate-300 py-3 pl-12 pr-4 font-bold focus:outline-none focus:ring-2 focus:ring-emerald-700"
               />
             </span>
