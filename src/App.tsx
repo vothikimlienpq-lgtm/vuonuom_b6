@@ -3,6 +3,7 @@ import { ToastProvider, useToast } from './components/Toast';
 import { Header } from './components/Header';
 import { Navigation, ModuleTab } from './components/Navigation';
 import { LoginModal } from './components/LoginModal';
+import { ParentPortal } from './components/ParentPortal';
 import { OverviewModule } from './components/modules/OverviewModule';
 import { PointEntryModule } from './components/modules/PointEntryModule';
 import { GroupCompetitionModule } from './components/modules/GroupCompetitionModule';
@@ -16,7 +17,7 @@ import { ClassSettingsModule } from './components/modules/ClassSettingsModule';
 import { FullClassData, UserSession } from './types';
 import { api } from './services/api';
 import { getCurrentWeekAndMonth, getWeekDateRange } from './utils/dateUtils';
-import { Sprout } from 'lucide-react';
+import { LogIn, ShieldCheck, Sprout } from 'lucide-react';
 
 function MainAppContent() {
   const { success, error } = useToast();
@@ -31,17 +32,26 @@ function MainAppContent() {
   const [activeTab, setActiveTab] = useState<ModuleTab>('overview');
 
   const [isLoading, setIsLoading] = useState(true);
+  const [sessionReady, setSessionReady] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(true);
 
-  // Subscribe to real-time data & fetch initial session
+  // Đọc phiên trước. Khách và phụ huynh không tải toàn bộ dữ liệu lớp.
   useEffect(() => {
-    // Initial session load
     api.getCurrentSession().then(userSession => {
       setSession(userSession);
+      setShowLoginModal(!userSession || userSession.role === 'guest');
+      setSessionReady(true);
+      if (!userSession || userSession.role === 'guest' || userSession.role === 'parent') {
+        setIsLoading(false);
+      }
     });
+  }, []);
 
-    // Real-time Firestore subscription
+  // Chỉ tài khoản thành viên lớp đã xác thực mới nhận toàn bộ dữ liệu thời gian thực.
+  useEffect(() => {
+    if (!sessionReady || !session || session.role === 'guest' || session.role === 'parent') return;
+    setIsLoading(true);
     const unsubscribe = api.subscribeFullClassData((fullData) => {
       setData(fullData);
       setIsLoading(false);
@@ -57,7 +67,7 @@ function MainAppContent() {
     return () => {
       if (unsubscribe) unsubscribe();
     };
-  }, []);
+  }, [sessionReady, session?.role, session?.username]);
 
   const fetchData = useCallback(async (quiet = false) => {
     if (!quiet) setIsSyncing(true);
@@ -101,8 +111,9 @@ function MainAppContent() {
     try {
       await api.logout();
       setSession(null);
+      setData(null);
+      setShowLoginModal(true);
       success('Đã kết thúc phiên làm việc an toàn.');
-      fetchData(true);
     } catch (err: any) {
       error(err.message || 'Lỗi khi đăng xuất');
     }
@@ -110,21 +121,52 @@ function MainAppContent() {
 
   const handleLoginSuccess = (newSession: UserSession) => {
     setSession(newSession);
-    fetchData(true);
+    if (newSession.role !== 'parent') fetchData(true);
   };
 
-  if (isLoading || !data) {
+  if (!sessionReady) {
     return (
       <div className="min-h-screen bg-[#f8faf9] flex flex-col items-center justify-center p-4">
         <div className="w-16 h-16 rounded-3xl bg-[#064e3b] p-3 shadow-xl flex items-center justify-center animate-bounce">
           <Sprout className="w-10 h-10 text-amber-300" />
         </div>
         <h2 className="text-xl font-black text-[#064e3b] mt-4 tracking-tight">
-          Vườn Ươm 11B6 Kim Liên
+          Đang mở cổng đăng nhập
         </h2>
         <p className="text-xs text-emerald-800 font-semibold mt-1 animate-pulse">
-          Đang khởi tạo và đồng bộ dữ liệu lớp học...
+          Đang kiểm tra phiên làm việc an toàn...
         </p>
+      </div>
+    );
+  }
+
+  if (session?.role === 'parent') {
+    return <ParentPortal session={session} onLogout={handleLogout} />;
+  }
+
+  if (!session || session.role === 'guest') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#043d2e] via-[#0b5b43] to-[#032b21] flex items-center justify-center p-4">
+        <div className="max-w-xl w-full rounded-[32px] bg-white/95 border border-emerald-100 p-8 text-center shadow-2xl">
+          <div className="w-16 h-16 mx-auto rounded-3xl bg-emerald-50 text-[#064e3b] flex items-center justify-center border border-emerald-100">
+            <ShieldCheck className="w-9 h-9" />
+          </div>
+          <h1 className="mt-5 text-3xl font-black text-[#064e3b]">Không gian lớp học</h1>
+          <p className="mt-2 text-sm text-slate-600">Vui lòng đăng nhập hoặc nhập mã tra cứu phụ huynh. Dữ liệu lớp không hiển thị trước khi xác thực.</p>
+          <button onClick={() => setShowLoginModal(true)} className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-[#064e3b] px-6 py-3 font-black text-amber-300 shadow-lg">
+            <LogIn className="w-5 h-5" /> MỞ CỬA SỔ ĐĂNG NHẬP
+          </button>
+        </div>
+        <LoginModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} onLoginSuccess={handleLoginSuccess} />
+      </div>
+    );
+  }
+
+  if (isLoading || !data) {
+    return (
+      <div className="min-h-screen bg-[#f8faf9] flex flex-col items-center justify-center p-4">
+        <div className="w-16 h-16 rounded-3xl bg-[#064e3b] p-3 shadow-xl flex items-center justify-center animate-bounce"><Sprout className="w-10 h-10 text-amber-300" /></div>
+        <h2 className="text-xl font-black text-[#064e3b] mt-4">Đang đồng bộ dữ liệu lớp học...</h2>
       </div>
     );
   }

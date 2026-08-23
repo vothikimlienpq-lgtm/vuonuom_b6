@@ -48,6 +48,7 @@ import {
   ClassConfig,
   DayLock,
   WeekLock,
+  ParentViewData,
 } from '../types';
 
 // Root class document reference
@@ -69,6 +70,41 @@ const remindersColRef = collection(db, 'classes', CLASS_ID, 'reminders');
 const cleaningAssignmentsColRef = collection(db, 'classes', CLASS_ID, 'cleaningAssignments');
 const auditLogsColRef = collection(db, 'classes', CLASS_ID, 'auditLogs');
 const authorizedUsersColRef = collection(db, 'classes', CLASS_ID, 'authorizedUsers');
+const parentViewsColRef = collection(db, 'classes', CLASS_ID, 'parentViews');
+
+const PARENT_SESSION_KEY = `parent-view-session:${CLASS_ID}`;
+
+const readParentSession = (): UserSession | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.sessionStorage.getItem(PARENT_SESSION_KEY);
+    if (!raw) return null;
+    const session = JSON.parse(raw) as UserSession;
+    if (session.role !== 'parent' || !session.parentView || session.expiresAt <= Date.now()) {
+      window.sessionStorage.removeItem(PARENT_SESSION_KEY);
+      return null;
+    }
+    return session;
+  } catch {
+    window.sessionStorage.removeItem(PARENT_SESSION_KEY);
+    return null;
+  }
+};
+
+const storeParentSession = (session: UserSession) => {
+  if (typeof window !== 'undefined') {
+    window.sessionStorage.setItem(PARENT_SESSION_KEY, JSON.stringify(session));
+  }
+};
+
+const clearParentSession = () => {
+  if (typeof window !== 'undefined') window.sessionStorage.removeItem(PARENT_SESSION_KEY);
+};
+
+const numberOrZero = (value: unknown): number => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
 
 // Default initial config
 export const DEFAULT_INITIAL_CONFIG: ClassConfig = {
@@ -166,12 +202,76 @@ export const api = {
   // AUTHENTICATION (Firebase Authentication onAuthStateChanged)
   // -------------------------------------------------------------
 
+  lookupParentView: async (code: string): Promise<{ success: boolean; session: UserSession; message: string }> => {
+    const normalizedCode = String(code || '').trim().toUpperCase();
+    if (!/^[A-Z0-9-]{6,40}$/.test(normalizedCode)) {
+      throw new Error('Mã tra cứu không đúng định dạng. Vui lòng kiểm tra lại mã giáo viên đã cấp.');
+    }
+
+    try {
+      const snapshot = await getDoc(doc(parentViewsColRef, normalizedCode));
+      if (!snapshot.exists() || snapshot.data().active !== true) {
+        throw new Error('Mã tra cứu không tồn tại hoặc đã bị khóa.');
+      }
+
+      const raw = snapshot.data();
+      const studentId = String(raw.studentId || '').trim();
+      const studentName = String(raw.studentName || '').trim();
+      if (!studentId || !studentName || studentId === 'ID học sinh' || studentName === 'Họ tên học sinh') {
+        throw new Error('Mã này chưa được giáo viên gắn với học sinh thật. Vui lòng liên hệ giáo viên chủ nhiệm.');
+      }
+
+      const conduct = raw.conductData && typeof raw.conductData === 'object' ? raw.conductData : {};
+      const homework = raw.weeklyHomework && typeof raw.weeklyHomework === 'object'
+        ? {
+            title: String(raw.weeklyHomework.title || 'Báo bài tuần'),
+            content: String(raw.weeklyHomework.content || ''),
+            weekNumber: numberOrZero(raw.weeklyHomework.weekNumber),
+          }
+        : undefined;
+
+      const parentView: ParentViewData = {
+        code: normalizedCode,
+        active: true,
+        studentId,
+        studentName,
+        group: numberOrZero(raw.group),
+        currentScore: numberOrZero(raw.currentScore),
+        allowTimetable: raw.allowTimetable === true,
+        conductData: {
+          plusPoints: numberOrZero(conduct.plusPoints),
+          minusPoints: numberOrZero(conduct.minusPoints),
+          totalScore: numberOrZero(conduct.totalScore),
+          violations: numberOrZero(conduct.violations),
+        },
+        weeklyHomework: homework,
+        timetable: raw.allowTimetable === true && Array.isArray(raw.timetable) ? raw.timetable : undefined,
+      };
+
+      const session: UserSession = {
+        role: 'parent',
+        username: `Phụ huynh của ${studentName}`,
+        studentId,
+        studentName,
+        groupNumber: parentView.group,
+        parentView,
+        expiresAt: Date.now() + 12 * 60 * 60 * 1000,
+      };
+      storeParentSession(session);
+      return { success: true, session, message: `Đã mở thông tin của học sinh ${studentName}.` };
+    } catch (err: any) {
+      if (err?.message?.startsWith('Mã ') || err?.message?.startsWith('Mã này')) throw err;
+      throw new Error('Không thể tra cứu mã phụ huynh. Vui lòng kiểm tra kết nối hoặc quyền Firestore.');
+    }
+  },
+
   login: async (payload: {
     email: string;
     password?: string;
   }): Promise<{ success: boolean; session: UserSession; message: string }> => {
     const { email, password } = payload;
     const cleanEmail = (email || TEACHER_EMAIL).trim();
+    clearParentSession();
 
     if (!password) {
       throw new Error('Vui lòng nhập mật khẩu tài khoản.');
@@ -229,6 +329,7 @@ export const api = {
   },
 
   logout: async () => {
+    clearParentSession();
     try {
       if (auth.currentUser) {
         await signOut(auth);
@@ -239,6 +340,9 @@ export const api = {
   },
 
   getCurrentSession: async (): Promise<UserSession> => {
+    const parentSession = readParentSession();
+    if (parentSession) return parentSession;
+
     const currentUser = auth.currentUser;
     if (!currentUser || !currentUser.email) {
       return {
@@ -281,6 +385,11 @@ export const api = {
   onAuthStateChanged: (callback: (session: UserSession) => void): Unsubscribe => {
     return onAuthStateChanged(auth, async (user: User | null) => {
       if (!user || !user.email) {
+        const parentSession = readParentSession();
+        if (parentSession) {
+          callback(parentSession);
+          return;
+        }
         callback({
           role: 'guest',
           username: 'Khách / Thành Viên Lớp',
@@ -742,6 +851,11 @@ export const api = {
     reason?: string;
   }): Promise<{ success: boolean; transaction: PointTransaction; message: string }> => {
     try {
+      const matchedStudent = latestFullData.students.find((student) => student.id === payload.studentId);
+      const studentName = String(payload.studentName || matchedStudent?.fullName || '').trim();
+      if (!payload.studentId || !studentName) {
+        throw new Error('Không xác định được học sinh. Vui lòng chọn lại học sinh trước khi lưu điểm.');
+      }
       const qty = payload.quantity || 1;
       const totalPts = payload.points * qty;
       const txId = `TX_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
@@ -750,7 +864,7 @@ export const api = {
       const newTx: PointTransaction = {
         id: txId,
         studentId: payload.studentId,
-        studentName: payload.studentName,
+        studentName,
         groupNumber: payload.groupNumber,
         month: payload.month,
         week: payload.week,
@@ -761,20 +875,21 @@ export const api = {
         points: payload.points,
         quantity: qty,
         totalPoints: totalPts,
-        subject: payload.subject,
-        examType: payload.examType,
-        reason: payload.reason,
         createdBy: currentSession.username,
         creatorRole: currentSession.role === 'gvcn' ? 'gvcn' : 'bcs',
         createdAt: new Date().toISOString(),
       };
+
+      if (payload.subject?.trim()) newTx.subject = payload.subject.trim();
+      if (payload.examType?.trim()) newTx.examType = payload.examType.trim();
+      if (payload.reason?.trim()) newTx.reason = payload.reason.trim();
 
       await setDoc(doc(transactionsColRef, txId), newTx);
 
       return {
         success: true,
         transaction: newTx,
-        message: `Đã ghi nhận ${payload.type === 'plus' ? 'điểm cộng' : 'điểm trừ'} cho học sinh ${payload.studentName}.`,
+        message: `Đã ghi nhận ${payload.type === 'plus' ? 'điểm cộng' : 'điểm trừ'} cho học sinh ${studentName}.`,
       };
     } catch (err) {
       handleFirestoreError(err, OperationType.CREATE, 'transactions');
@@ -791,8 +906,11 @@ export const api = {
   ): Promise<{ success: boolean; transaction: PointTransaction; message: string }> => {
     try {
       const txDocRef = doc(transactionsColRef, id);
+      const cleanPayload = Object.fromEntries(
+        Object.entries(payload).filter(([, value]) => value !== undefined)
+      );
       const updateData = {
-        ...payload,
+        ...cleanPayload,
         updatedAt: new Date().toISOString(),
       };
       await updateDoc(txDocRef, updateData);

@@ -4,7 +4,6 @@ import {
   Lock, 
   Sparkles, 
   ShieldCheck, 
-  Users, 
   KeyRound, 
   AlertCircle,
   Clock,
@@ -32,6 +31,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   const [selectedRole, setSelectedRole] = useState<UserRole>('gvcn');
   const [email, setEmail] = useState(TEACHER_EMAIL);
   const [password, setPassword] = useState('');
+  const [parentCode, setParentCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -45,10 +45,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     setLoading(true);
 
     try {
-      const res = await api.login({
-        email: selectedRole === 'gvcn' ? (email || TEACHER_EMAIL) : email,
-        password,
-      });
+      const res = selectedRole === 'parent'
+        ? await api.lookupParentView(parentCode)
+        : await api.login({
+            email: selectedRole === 'gvcn' ? (email || TEACHER_EMAIL) : email,
+            password,
+          });
 
       if (res.success) {
         success(res.message || 'Đăng nhập thành công!');
@@ -95,10 +97,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({
         </div>
 
         {/* Role Selection Tabs */}
-        <div className="grid grid-cols-2 gap-2 mb-6">
+        <div className="grid grid-cols-3 gap-2 mb-6">
           {[
             { id: 'gvcn' as UserRole, label: 'Giáo Viên Chủ Nhiệm', icon: Sparkles, desc: 'Toàn quyền quản trị & chốt sổ' },
             { id: 'bcs' as UserRole, label: 'Ban Cán Sự / Quản lý', icon: ShieldCheck, desc: 'Ghi nhận điểm thi đua & báo bài' },
+            { id: 'parent' as UserRole, label: 'Phụ Huynh', icon: KeyRound, desc: 'Chỉ nhập mã tra cứu' },
           ].map(tab => {
             const Icon = tab.icon;
             const isSelected = selectedRole === tab.id;
@@ -110,7 +113,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                   setSelectedRole(tab.id);
                   if (tab.id === 'gvcn') {
                     setEmail(TEACHER_EMAIL);
-                  } else {
+                  } else if (tab.id !== 'parent') {
                     setEmail('');
                   }
                   setErrorMsg('');
@@ -146,8 +149,29 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
         {/* Input Form */}
         <form onSubmit={handleLogin} className="space-y-4">
-          
-          {/* Email input */}
+          {selectedRole === 'parent' ? (
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                Mã tra cứu phụ huynh
+              </label>
+              <div className="relative">
+                <KeyRound className="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={parentCode}
+                  onChange={(e) => setParentCode(e.target.value.toUpperCase().replace(/\s/g, ''))}
+                  placeholder="Ví dụ: PH-11B6-A7K92X"
+                  required
+                  autoComplete="off"
+                  className="w-full pl-11 pr-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-slate-900 font-black text-sm uppercase tracking-wide focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#064e3b] transition"
+                />
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
+                Chỉ nhập mã riêng do giáo viên cấp. Phụ huynh không cần email hoặc mật khẩu Firebase.
+              </p>
+            </div>
+          ) : (
+            <>
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider flex items-center justify-between">
               <span>{selectedRole === 'gvcn' ? 'Email GVCN (Firebase Auth)' : 'Email Tài Khoản Phân Quyền'}</span>
@@ -195,20 +219,24 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               * Mật khẩu được bảo vệ trực tiếp bởi Google Firebase Security. Không lưu mật khẩu trên trình duyệt hay mã nguồn.
             </p>
           </div>
+            </>
+          )}
 
           <button
             type="submit"
             disabled={loading || !!lockoutMinutes}
             className="w-full py-3.5 px-4 rounded-2xl bg-[#064e3b] hover:bg-[#085f48] text-amber-300 font-black text-sm tracking-wide shadow-lg shadow-emerald-950/20 transition active:scale-[0.99] disabled:opacity-50 cursor-pointer"
           >
-            {loading ? 'Đang xác thực qua Firebase...' : 'XÁC NHẬN ĐĂNG NHẬP'}
+            {loading
+              ? (selectedRole === 'parent' ? 'Đang tra cứu mã...' : 'Đang xác thực qua Firebase...')
+              : (selectedRole === 'parent' ? 'TRA CỨU THÔNG TIN CON' : 'XÁC NHẬN ĐĂNG NHẬP')}
           </button>
         </form>
 
         {/* Public View note */}
         <div className="mt-6 pt-4 border-t border-slate-100 text-center">
           <p className="text-xs text-slate-500">
-            Học sinh và phụ huynh có thể tra cứu kết quả thi đua, nề nếp, thời khóa biểu và báo bài trực tiếp mà không cần tài khoản quản trị.
+            Phụ huynh chỉ xem được thông tin của học sinh gắn với mã tra cứu; không xem danh sách lớp, không nhập điểm và không vào phần cài đặt.
           </p>
         </div>
 

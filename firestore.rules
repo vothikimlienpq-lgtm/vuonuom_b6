@@ -117,6 +117,14 @@ service cloud.firestore {
         allow read: if isGVCN() || (isAuthenticated() && request.auth.uid == userId);
         allow write: if isGVCN();
       }
+
+      // 13. Parent lookup: only an exact active code may be read publicly.
+      // Listing all codes is forbidden; only GVCN can create or edit them.
+      match /parentViews/{code} {
+        allow get: if resource.data.active == true;
+        allow list: if false;
+        allow create, update, delete: if isGVCN();
+      }
     }
 
     // Default deny all other paths

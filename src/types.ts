@@ -211,6 +211,29 @@ export interface UserSession {
   groupNumber?: number;
   expiresAt: number; // timestamp ms
   bcsTimeRemaining?: number; // seconds
+  parentView?: ParentViewData;
+}
+
+export interface ParentViewData {
+  code: string;
+  active: boolean;
+  studentId: string;
+  studentName: string;
+  group: number;
+  currentScore: number;
+  allowTimetable: boolean;
+  conductData: {
+    plusPoints: number;
+    minusPoints: number;
+    totalScore: number;
+    violations: number;
+  };
+  weeklyHomework?: {
+    title?: string;
+    content?: string;
+    weekNumber?: number;
+  };
+  timetable?: TimetableEntry[];
 }
 
 export interface AuditLog {
