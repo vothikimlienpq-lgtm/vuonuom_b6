@@ -1,7 +1,7 @@
 import React from 'react';
 import { Printer, X, Download, Sprout, School, UserCheck } from 'lucide-react';
 import { Student, FullClassData } from '../types';
-import { computeStudentScores } from '../utils/calculations';
+import { computeStudentScores, formatSignedPoints, getSignedTransactionPoints } from '../utils/calculations';
 
 interface ParentReportPrintModalProps {
   isOpen: boolean;
@@ -25,6 +25,15 @@ export const ParentReportPrintModal: React.FC<ParentReportPrintModalProps> = ({
   const allStudents = data.students || [];
   const allTransactions = data.transactions || [];
   const config = data.config;
+  const configuredTeacher = String(config.teacherName || '').trim();
+  const hasTeacherName = configuredTeacher && configuredTeacher.toLowerCase() !== 'chưa cập nhật';
+  const teacherName = hasTeacherName
+    ? configuredTeacher
+    : String(config.className || '').toUpperCase() === '11B6'
+      ? 'Cô Võ Thị Kim Liên'
+      : 'Chưa cập nhật tên GVCN';
+  const academicYears = String(config.academicYear || '').match(/20\d{2}/g);
+  const reportYear = academicYears?.[academicYears.length - 1] || new Date().getFullYear();
 
   const studentSummaries = computeStudentScores(allStudents, allTransactions, selectedMonth);
 
@@ -33,10 +42,10 @@ export const ParentReportPrintModal: React.FC<ParentReportPrintModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-emerald-950/80 backdrop-blur-sm overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-start justify-center px-4 pb-4 pt-28 bg-emerald-950/80 backdrop-blur-sm overflow-y-auto print:p-0">
       
       {/* Top Floating Control Bar (Hidden on print) */}
-      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-white/95 backdrop-blur-md px-6 py-3 rounded-full shadow-2xl border border-emerald-200 flex items-center gap-4 no-print">
+      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-white/95 backdrop-blur-md px-4 sm:px-6 py-3 rounded-3xl sm:rounded-full shadow-2xl border border-emerald-200 flex flex-wrap items-center justify-center gap-3 sm:gap-4 no-print w-[calc(100%-2rem)] sm:w-auto">
         <span className="text-xs font-bold text-emerald-950">
           Xem trước bản in A4 ({students.length} phiếu)
         </span>
@@ -56,7 +65,7 @@ export const ParentReportPrintModal: React.FC<ParentReportPrintModalProps> = ({
       </div>
 
       {/* Printable Sheet Container */}
-      <div className="mt-16 mb-8 w-full max-w-3xl space-y-8 print:m-0 print:w-full print:max-w-none">
+      <div className="mb-8 w-full max-w-3xl space-y-8 print:m-0 print:w-full print:max-w-none print-container">
         {students.map((student, sIdx) => {
           const summary = studentSummaries.find(s => s.studentId === student.id);
           const studentTxs = allTransactions.filter(
@@ -124,7 +133,7 @@ export const ParentReportPrintModal: React.FC<ParentReportPrintModalProps> = ({
                 </div>
                 <div>
                   <span className="text-slate-500">GVCN phụ trách:</span>
-                  <div className="font-bold">{config.teacherName || 'Cô Võ Thị Kim Liên'}</div>
+                  <div className="font-bold">{teacherName}</div>
                 </div>
               </div>
 
@@ -147,12 +156,12 @@ export const ParentReportPrintModal: React.FC<ParentReportPrintModalProps> = ({
                     </thead>
                     <tbody className="divide-y divide-slate-200">
                       <tr>
-                        <td className="p-2.5 border-r border-slate-200 font-bold">+{summary.weekScores[1] || 0}đ</td>
-                        <td className="p-2.5 border-r border-slate-200 font-bold">+{summary.weekScores[2] || 0}đ</td>
-                        <td className="p-2.5 border-r border-slate-200 font-bold">+{summary.weekScores[3] || 0}đ</td>
-                        <td className="p-2.5 border-r border-slate-200 font-bold">+{summary.weekScores[4] || 0}đ</td>
+                        <td className="p-2.5 border-r border-slate-200 font-bold">{formatSignedPoints(summary.weekScores[1] || 0, 'đ')}</td>
+                        <td className="p-2.5 border-r border-slate-200 font-bold">{formatSignedPoints(summary.weekScores[2] || 0, 'đ')}</td>
+                        <td className="p-2.5 border-r border-slate-200 font-bold">{formatSignedPoints(summary.weekScores[3] || 0, 'đ')}</td>
+                        <td className="p-2.5 border-r border-slate-200 font-bold">{formatSignedPoints(summary.weekScores[4] || 0, 'đ')}</td>
                         <td className="p-2.5 border-r border-slate-200 font-black text-sm text-[#064e3b]">
-                          {summary.monthTotal}đ
+                          {formatSignedPoints(summary.monthTotal, 'đ')}
                         </td>
                         <td className="p-2.5 font-black text-sm text-emerald-800">
                           {summary.conductRank} {summary.isTemporary && '(Tạm)'}
@@ -210,7 +219,7 @@ export const ParentReportPrintModal: React.FC<ParentReportPrintModalProps> = ({
                             <td className="p-2 text-slate-600">{t.dayOfWeek}, Tuần {t.week}</td>
                             <td className="p-2 font-medium text-slate-900">{t.ruleContent}</td>
                             <td className={`p-2 text-center font-bold ${t.type === 'plus' ? 'text-emerald-700' : 'text-rose-700'}`}>
-                              {t.type === 'plus' ? `+${t.totalPoints}` : t.totalPoints}đ
+                              {formatSignedPoints(getSignedTransactionPoints(t), 'đ')}
                             </td>
                             <td className="p-2 text-slate-500">{t.reason || t.subject || '-'}</td>
                           </tr>
@@ -245,12 +254,12 @@ export const ParentReportPrintModal: React.FC<ParentReportPrintModalProps> = ({
 
                 <div>
                   <div className="text-[11px] text-slate-500 italic mb-1">
-                    Hà Nội, ngày ..... tháng ..... năm 2025
+                    Hà Nội, ngày ..... tháng ..... năm {reportYear}
                   </div>
                   <div className="font-bold text-slate-800 uppercase">GIÁO VIÊN CHỦ NHIỆM</div>
                   <div className="text-[10px] text-slate-400 italic mt-0.5">(Ký và ghi rõ họ tên)</div>
                   <div className="h-16 flex items-end justify-center font-bold text-emerald-950 text-sm">
-                    {config.teacherName || 'Cô Võ Thị Kim Liên'}
+                    {teacherName}
                   </div>
                 </div>
               </div>

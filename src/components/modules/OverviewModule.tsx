@@ -17,7 +17,7 @@ import {
   Sparkle
 } from 'lucide-react';
 import { FullClassData } from '../../types';
-import { computeStudentScores, computeGroupStandings } from '../../utils/calculations';
+import { computeStudentScores, computeGroupStandings, formatSignedPoints } from '../../utils/calculations';
 import { ModuleTab } from '../Navigation';
 
 interface OverviewModuleProps {
@@ -248,7 +248,7 @@ export const OverviewModule: React.FC<OverviewModuleProps> = ({
 
                 <div className="text-right">
                   <span className="inline-block font-black text-emerald-800 text-base">
-                    +{st.monthTotal}đ
+                    {formatSignedPoints(st.monthTotal, 'đ')}
                   </span>
                   <div className="text-[11px] font-bold text-emerald-600">
                     Xếp loại: {st.conductRank}

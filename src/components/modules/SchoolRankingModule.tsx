@@ -14,6 +14,7 @@ import {
 import { FullClassData, SchoolRankRecord, UserRole } from '../../types';
 import { api } from '../../services/api';
 import { useToast } from '../Toast';
+import { getWeekDateRange } from '../../utils/dateUtils';
 
 interface SchoolRankingModuleProps {
   data: FullClassData;
@@ -32,29 +33,46 @@ export const SchoolRankingModule: React.FC<SchoolRankingModuleProps> = ({
 }) => {
   const { success, error } = useToast();
   const [showAddModal, setShowAddModal] = useState(false);
+  const [modalWeek, setModalWeek] = useState<number>(selectedWeek);
   const [schoolRank, setSchoolRank] = useState<number>(1);
   const [totalSchoolClasses, setTotalSchoolClasses] = useState<number>(36);
   const [gradeRank, setGradeRank] = useState<number>(1);
   const [totalGradeClasses, setTotalGradeClasses] = useState<number>(12);
   const [competitionPoints, setCompetitionPoints] = useState<number>(98.5);
+  const [deductedPoints, setDeductedPoints] = useState<number>(0);
   const [note, setNote] = useState<string>('');
   const [saving, setSaving] = useState(false);
 
   const isGvcn = userRole === 'gvcn';
   const rankings = data.schoolRankings || [];
 
+  const openUpdateModal = () => {
+    const existing = rankings.find(record => record.month === selectedMonth && record.week === selectedWeek);
+    setModalWeek(selectedWeek);
+    setSchoolRank(existing?.schoolRank || 1);
+    setTotalSchoolClasses(existing?.totalSchoolClasses || 36);
+    setGradeRank(existing?.gradeRank || 1);
+    setTotalGradeClasses(existing?.totalGradeClasses || 12);
+    setCompetitionPoints(existing?.competitionPoints ?? 100);
+    setDeductedPoints(existing?.deductedPoints ?? Math.max(0, 100 - (existing?.competitionPoints ?? 100)));
+    setNote(existing?.deductionReason || existing?.note || '');
+    setShowAddModal(true);
+  };
+
   const handleSaveRank = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
       const res = await api.saveSchoolRank({
-        month: selectedMonth,
-        week: selectedWeek,
+        month: getWeekDateRange(data.config.week1StartDate, modalWeek).monthNum,
+        week: modalWeek,
         schoolRank,
         totalSchoolClasses,
         gradeRank,
         totalGradeClasses,
         competitionPoints,
+        deductedPoints,
+        deductionReason: note,
         note,
       });
       if (res.success) {
@@ -106,11 +124,11 @@ export const SchoolRankingModule: React.FC<SchoolRankingModuleProps> = ({
 
         {isGvcn && (
           <button
-            onClick={() => setShowAddModal(true)}
+            onClick={openUpdateModal}
             className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-emerald-950 font-bold text-xs sm:text-sm shadow-md transition active:scale-95 cursor-pointer shrink-0"
           >
             <PlusCircle className="w-4 h-4 text-emerald-950" />
-            <span>Cập nhật thứ hạng tuần này</span>
+            <span>Cập nhật thứ hạng</span>
           </button>
         )}
       </div>
@@ -151,12 +169,12 @@ export const SchoolRankingModule: React.FC<SchoolRankingModuleProps> = ({
 
           <div className="bg-white rounded-[24px] p-6 border border-emerald-100 shadow-sm flex items-center justify-between">
             <div>
-              <div className="text-xs font-bold text-slate-500 uppercase">Điểm thi đua trường chấm</div>
+              <div className="text-xs font-bold text-slate-500 uppercase">Điểm lớp bị trừ trong tuần</div>
               <div className="text-3xl sm:text-4xl font-black text-emerald-700 mt-1">
-                {latestRank.competitionPoints} <span className="text-sm font-semibold text-slate-400">/ 100đ</span>
+                −{latestRank.deductedPoints ?? Math.max(0, 100 - latestRank.competitionPoints)} <span className="text-sm font-semibold text-slate-400">điểm</span>
               </div>
               <div className="text-[11px] text-slate-500 font-medium mt-1 truncate max-w-[200px]">
-                {latestRank.note || 'Nề nếp và chuyên cần tốt'}
+                {latestRank.deductionReason || latestRank.note || 'Không bị trừ điểm'}
               </div>
             </div>
             <div className="w-12 h-12 rounded-2xl bg-teal-100 text-teal-800 flex items-center justify-center font-black">
@@ -185,8 +203,8 @@ export const SchoolRankingModule: React.FC<SchoolRankingModuleProps> = ({
                   <th className="p-3">Thời điểm</th>
                   <th className="p-3 text-center">Hạng toàn trường</th>
                   <th className="p-3 text-center">Hạng khối 11</th>
-                  <th className="p-3 text-center">Điểm trường chấm</th>
-                  <th className="p-3">Đánh giá & Ghi chú của Đoàn trường</th>
+                  <th className="p-3 text-center">Điểm bị trừ</th>
+                  <th className="p-3">Lý do bị trừ điểm</th>
                   <th className="p-3 text-right">Ngày cập nhật</th>
                   {isGvcn && <th className="p-3 text-right">Thao tác</th>}
                 </tr>
@@ -204,10 +222,10 @@ export const SchoolRankingModule: React.FC<SchoolRankingModuleProps> = ({
                       #{r.gradeRank} / {r.totalGradeClasses}
                     </td>
                     <td className="p-3 text-center font-black text-slate-900">
-                      {r.competitionPoints}đ
+                      −{r.deductedPoints ?? Math.max(0, 100 - r.competitionPoints)}đ
                     </td>
                     <td className="p-3 text-slate-700 font-medium">
-                      {r.note || '-'}
+                      {r.deductionReason || r.note || '-'}
                     </td>
                     <td className="p-3 text-right text-slate-400 whitespace-nowrap font-mono text-[11px]">
                       {r.updatedDate}
@@ -241,6 +259,35 @@ export const SchoolRankingModule: React.FC<SchoolRankingModuleProps> = ({
             </h3>
 
             <form onSubmit={handleSaveRank} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Chọn tuần cập nhật:</label>
+                <select
+                  value={modalWeek}
+                  onChange={(e) => {
+                    const week = Number(e.target.value);
+                    setModalWeek(week);
+                    const existing = rankings.find(record => record.week === week);
+                    if (existing) {
+                      setSchoolRank(existing.schoolRank);
+                      setTotalSchoolClasses(existing.totalSchoolClasses);
+                      setGradeRank(existing.gradeRank);
+                      setTotalGradeClasses(existing.totalGradeClasses);
+                      setCompetitionPoints(existing.competitionPoints);
+                      setDeductedPoints(existing.deductedPoints ?? Math.max(0, 100 - existing.competitionPoints));
+                      setNote(existing.deductionReason || existing.note || '');
+                    } else {
+                      setDeductedPoints(0);
+                      setCompetitionPoints(100);
+                      setNote('');
+                    }
+                  }}
+                  className="w-full p-2.5 rounded-xl border border-slate-300 font-bold text-sm bg-white"
+                >
+                  {Array.from({ length: Math.max(4, Number(data.config.totalWeeks) || 4) }, (_, index) => index + 1).map(week => (
+                    <option key={week} value={week}>Tuần {week}</option>
+                  ))}
+                </select>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">Hạng toàn trường:</label>
@@ -292,25 +339,27 @@ export const SchoolRankingModule: React.FC<SchoolRankingModuleProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Điểm thi đua trường chấm:</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Điểm lớp bị trừ trong tuần:</label>
                 <input
                   type="number"
-                  step="0.1"
                   min={0}
-                  max={100}
-                  value={competitionPoints}
-                  onChange={(e) => setCompetitionPoints(Number(e.target.value))}
+                  value={deductedPoints}
+                  onChange={(e) => {
+                    const points = Math.max(0, Number(e.target.value));
+                    setDeductedPoints(points);
+                    setCompetitionPoints(Math.max(0, 100 - points));
+                  }}
                   required
                   className="w-full p-2.5 rounded-xl border border-slate-300 font-bold text-sm bg-white"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Ghi chú / Nhận xét của Đoàn trường:</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Lý do bị trừ điểm:</label>
                 <textarea
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
-                  placeholder="Ví dụ: Đạt cờ Nhất tuần 2. Cần lưu ý 1 bạn quên đồng phục..."
+                  placeholder="Ghi rõ học sinh, sự việc hoặc nội dung lớp bị trừ điểm..."
                   rows={2}
                   className="w-full p-2.5 rounded-xl border border-slate-300 text-xs bg-white"
                 />

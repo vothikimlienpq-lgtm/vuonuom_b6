@@ -30,6 +30,7 @@ import {
 import { api } from '../../services/api';
 import { useToast } from '../Toast';
 import { getWeekDateRange } from '../../utils/dateUtils';
+import { formatSignedPoints, getSignedTransactionPoints } from '../../utils/calculations';
 
 const DAYS_OF_WEEK: DayOfWeek[] = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
 
@@ -76,6 +77,8 @@ export const PointEntryModule: React.FC<PointEntryModuleProps> = ({
   
   // Recording Modal State
   const [activeStudent, setActiveStudent] = useState<Student | null>(null);
+  const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
+  const [selectedTargetIds, setSelectedTargetIds] = useState<string[]>([]);
   const [ruleTypeFilter, setRuleTypeFilter] = useState<'all' | 'plus' | 'minus'>('all');
   const [selectedRule, setSelectedRule] = useState<PointRule | null>(null);
   const [quantity, setQuantity] = useState<number>(1);
@@ -128,16 +131,52 @@ export const PointEntryModule: React.FC<PointEntryModuleProps> = ({
     }
 
     setActiveStudent(student);
+    setSelectedTargetIds([student.id]);
+    setIsRecordModalOpen(true);
     setSelectedRule(null);
     setQuantity(1);
     setFlexiblePoints(5);
     setReason('');
   };
 
+  const handleOpenBulkRecordModal = () => {
+    if (!canEdit) {
+      warning('Bạn cần đăng nhập vai trò Ban cán sự hoặc GVCN để ghi nhận điểm.');
+      return;
+    }
+    if (isWeekLocked || (isDayLocked && !isGvcn)) {
+      error('Ngày hoặc tuần này đang bị khóa, không thể ghi nhận thêm.');
+      return;
+    }
+    const targets = students.filter(student =>
+      selectedGroupFilter === 'all' || student.groupNumber === selectedGroupFilter
+    );
+    setActiveStudent(null);
+    setSelectedTargetIds(targets.map(student => student.id));
+    setIsRecordModalOpen(true);
+    setSelectedRule(null);
+    setQuantity(1);
+    setFlexiblePoints(5);
+    setReason('');
+  };
+
+  const closeRecordModal = () => {
+    if (submitting) return;
+    setIsRecordModalOpen(false);
+    setActiveStudent(null);
+    setSelectedTargetIds([]);
+  };
+
   const handleSaveTransaction = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeStudent || !selectedRule) {
+    if (!selectedRule) {
       error('Vui lòng chọn quy định điểm cộng hoặc trừ.');
+      return;
+    }
+
+    const targetStudents = students.filter(student => selectedTargetIds.includes(student.id));
+    if (targetStudents.length === 0) {
+      error('Vui lòng chọn ít nhất một học sinh.');
       return;
     }
 
@@ -148,30 +187,30 @@ export const PointEntryModule: React.FC<PointEntryModuleProps> = ({
 
     setSubmitting(true);
     try {
-      const res = await api.createTransaction({
-        studentId: activeStudent.id,
-        studentName: activeStudent.fullName,
-        groupNumber: activeStudent.groupNumber,
-        month: selectedMonth,
-        week: selectedWeek,
-        dayOfWeek: selectedDay,
-        ruleId: selectedRule.id,
-        ruleContent: selectedRule.content,
-        type: selectedRule.type,
-        points: selectedRule.isFlexiblePoints ? flexiblePoints : selectedRule.defaultPoints,
-        quantity,
-        subject: selectedRule.requiresSubjectAndExamType ? subject : undefined,
-        examType: selectedRule.requiresSubjectAndExamType ? examType : undefined,
-        reason: reason.trim() || undefined,
-        flexiblePoints: selectedRule.isFlexiblePoints ? flexiblePoints : undefined,
-      });
-
-      if (res.success) {
-        success(res.message);
-        setActiveStudent(null);
-        setSelectedRule(null);
-        onRefresh();
+      for (const student of targetStudents) {
+        await api.createTransaction({
+          studentId: student.id,
+          studentName: student.fullName,
+          groupNumber: student.groupNumber,
+          month: selectedMonth,
+          week: selectedWeek,
+          dayOfWeek: selectedDay,
+          ruleId: selectedRule.id,
+          ruleContent: selectedRule.content,
+          type: selectedRule.type,
+          points: selectedRule.isFlexiblePoints ? flexiblePoints : selectedRule.defaultPoints,
+          quantity,
+          subject: selectedRule.requiresSubjectAndExamType ? subject : undefined,
+          examType: selectedRule.requiresSubjectAndExamType ? examType : undefined,
+          reason: reason.trim() || undefined,
+        });
       }
+      success(`Đã ghi nhận điểm cho ${targetStudents.length} học sinh.`);
+      setIsRecordModalOpen(false);
+      setActiveStudent(null);
+      setSelectedTargetIds([]);
+      setSelectedRule(null);
+      onRefresh();
     } catch (err: any) {
       error(err.message || 'Lỗi khi lưu điểm');
     } finally {
@@ -412,16 +451,28 @@ export const PointEntryModule: React.FC<PointEntryModuleProps> = ({
             ))}
           </div>
 
-          {/* Search Box */}
-          <div className="relative min-w-[240px]">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Tìm tên học sinh..."
-              className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-700"
-            />
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            {canEdit && (
+              <button
+                type="button"
+                onClick={handleOpenBulkRecordModal}
+                disabled={isWeekLocked || (isDayLocked && !isGvcn)}
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-amber-400 text-emerald-950 text-xs font-black hover:bg-amber-300 disabled:opacity-50"
+              >
+                <UserCheck className="w-4 h-4" />
+                Ghi cho {selectedGroupFilter === 'all' ? 'cả lớp' : `Tổ ${selectedGroupFilter}`}
+              </button>
+            )}
+            <div className="relative min-w-[240px]">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Tìm tên học sinh..."
+                className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-700"
+              />
+            </div>
           </div>
         </div>
 
@@ -430,7 +481,7 @@ export const PointEntryModule: React.FC<PointEntryModuleProps> = ({
           {filteredStudents.map(student => {
             // Count student transactions today
             const todayTxs = weekTransactions.filter(t => t.studentId === student.id && t.dayOfWeek === selectedDay);
-            const todayPoints = todayTxs.reduce((sum, t) => sum + t.totalPoints, 0);
+            const todayPoints = todayTxs.reduce((sum, t) => sum + getSignedTransactionPoints(t), 0);
 
             return (
               <div
@@ -543,7 +594,7 @@ export const PointEntryModule: React.FC<PointEntryModuleProps> = ({
                         <span className={`px-2 py-0.5 rounded-full font-black text-xs ${
                           isPlus ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
                         }`}>
-                          {isPlus ? `+${tx.totalPoints}` : tx.totalPoints}đ
+                          {formatSignedPoints(getSignedTransactionPoints(tx), 'đ')}
                         </span>
                       </td>
                       <td className="p-3 text-slate-600">
@@ -587,7 +638,7 @@ export const PointEntryModule: React.FC<PointEntryModuleProps> = ({
       </div>
 
       {/* Record Point Modal Popup */}
-      {activeStudent && (
+      {isRecordModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-emerald-950/70 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white rounded-[28px] max-w-2xl w-full p-6 sm:p-7 shadow-2xl border border-emerald-100 max-h-[90vh] overflow-y-auto relative">
             
@@ -597,11 +648,13 @@ export const PointEntryModule: React.FC<PointEntryModuleProps> = ({
                   Ghi nhận điểm ({selectedDay}, Tuần {selectedWeek})
                 </span>
                 <h3 className="text-xl font-black text-emerald-950 mt-0.5">
-                  Học sinh: {activeStudent.fullName} (Tổ {activeStudent.groupNumber})
+                  {activeStudent
+                    ? `Học sinh: ${activeStudent.fullName} (Tổ ${activeStudent.groupNumber})`
+                    : `Nhập hàng loạt: ${selectedTargetIds.length} học sinh`}
                 </h3>
               </div>
               <button
-                onClick={() => setActiveStudent(null)}
+                onClick={closeRecordModal}
                 className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100"
               >
                 ✕
@@ -609,6 +662,34 @@ export const PointEntryModule: React.FC<PointEntryModuleProps> = ({
             </div>
 
             <form onSubmit={handleSaveTransaction} className="mt-5 space-y-4">
+              {!activeStudent && (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3">
+                  <div className="flex items-center justify-between gap-3 mb-2">
+                    <span className="text-xs font-black text-emerald-950">Học sinh được áp dụng</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedTargetIds(selectedTargetIds.length === students.length ? [] : students.map(student => student.id))}
+                      className="text-[11px] font-bold text-emerald-800 underline"
+                    >
+                      {selectedTargetIds.length === students.length ? 'Bỏ chọn tất cả' : 'Chọn cả lớp'}
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-36 overflow-y-auto">
+                    {students.map(student => (
+                      <label key={student.id} className="flex items-center gap-2 p-2 rounded-lg bg-white border border-slate-200 text-xs font-semibold cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={selectedTargetIds.includes(student.id)}
+                          onChange={() => setSelectedTargetIds(ids => ids.includes(student.id)
+                            ? ids.filter(id => id !== student.id)
+                            : [...ids, student.id])}
+                        />
+                        <span>{student.fullName} · Tổ {student.groupNumber}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
               
               {/* Type Filter Buttons */}
               <div className="flex items-center gap-2">
@@ -778,17 +859,17 @@ export const PointEntryModule: React.FC<PointEntryModuleProps> = ({
               <div className="flex items-center justify-end gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setActiveStudent(null)}
+                  onClick={closeRecordModal}
                   className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100"
                 >
                   Hủy bỏ
                 </button>
                 <button
                   type="submit"
-                  disabled={submitting || !selectedRule}
+                  disabled={submitting || !selectedRule || selectedTargetIds.length === 0}
                   className="px-6 py-2.5 rounded-xl bg-[#064e3b] hover:bg-[#095c47] text-amber-300 font-bold text-xs shadow-md transition disabled:opacity-50 cursor-pointer"
                 >
-                  {submitting ? 'Đang lưu...' : 'XÁC NHẬN LƯU ĐIỂM'}
+                  {submitting ? 'Đang lưu...' : `XÁC NHẬN CHO ${selectedTargetIds.length} HỌC SINH`}
                 </button>
               </div>
 

@@ -130,6 +130,8 @@ export interface SchoolRankRecord {
   gradeRank: number;
   totalGradeClasses: number;
   competitionPoints: number;
+  deductedPoints?: number;
+  deductionReason?: string;
   updatedDate: string;
   note: string;
 }

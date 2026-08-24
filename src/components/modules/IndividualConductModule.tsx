@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { FullClassData, Student, UserRole, UserSession } from '../../types';
 import { ModuleTab } from '../Navigation';
-import { computeStudentScores, StudentScoreSummary } from '../../utils/calculations';
+import { computeStudentScores, formatSignedPoints, getSignedTransactionPoints, StudentScoreSummary } from '../../utils/calculations';
 import { ParentReportPrintModal } from '../ParentReportPrintModal';
 import { useToast } from '../Toast';
 
@@ -146,7 +146,7 @@ export const IndividualConductModule: React.FC<IndividualConductModuleProps> = (
                 Tổng điểm Tháng {selectedMonth}
               </div>
               <div className="text-3xl sm:text-4xl font-black text-[#064e3b] mt-2">
-                +{summary.monthTotal}đ
+                {formatSignedPoints(summary.monthTotal, 'đ')}
               </div>
               <div className="text-[11px] text-slate-500 mt-2 font-medium">
                 Khởi điểm: +200đ mỗi tháng
@@ -205,7 +205,7 @@ export const IndividualConductModule: React.FC<IndividualConductModuleProps> = (
                 <div key={w} className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-100 text-center">
                   <div className="text-xs font-bold text-slate-500 uppercase">Tuần {w}</div>
                   <div className="text-2xl font-black text-[#064e3b] mt-1">
-                    +{summary.weekScores[w] || 0}đ
+                    {formatSignedPoints(summary.weekScores[w] || 0, 'đ')}
                   </div>
                   <div className="text-[10px] text-emerald-800 font-medium mt-1">
                     {(summary.weekScores[w] || 0) >= 50 ? '✓ Đạt chuẩn tuần' : 'Cần phấn đấu thêm'}
@@ -274,7 +274,7 @@ export const IndividualConductModule: React.FC<IndividualConductModuleProps> = (
                       </td>
                       <td className="p-3 text-right whitespace-nowrap">
                         <span className={`font-black text-sm ${t.type === 'plus' ? 'text-emerald-700' : 'text-rose-700'}`}>
-                          {t.type === 'plus' ? `+${t.totalPoints}` : `${t.totalPoints}`}đ
+                          {formatSignedPoints(getSignedTransactionPoints(t), 'đ')}
                         </span>
                       </td>
                     </tr>
@@ -550,16 +550,16 @@ export const IndividualConductModule: React.FC<IndividualConductModuleProps> = (
                       )}
                     </td>
                     <td className="p-3 text-center font-semibold text-slate-700">
-                      +{s.weekScores[1] || 0}
+                      {formatSignedPoints(s.weekScores[1] || 0)}
                     </td>
                     <td className="p-3 text-center font-semibold text-slate-700">
-                      +{s.weekScores[2] || 0}
+                      {formatSignedPoints(s.weekScores[2] || 0)}
                     </td>
                     <td className="p-3 text-center font-semibold text-slate-700">
-                      +{s.weekScores[3] || 0}
+                      {formatSignedPoints(s.weekScores[3] || 0)}
                     </td>
                     <td className="p-3 text-center font-semibold text-slate-700">
-                      +{s.weekScores[4] || 0}
+                      {formatSignedPoints(s.weekScores[4] || 0)}
                     </td>
                     <td className="p-3 text-center font-black text-emerald-800 text-sm">
                       {s.monthTotal}đ
@@ -621,7 +621,7 @@ export const IndividualConductModule: React.FC<IndividualConductModuleProps> = (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 my-4">
               <div className="p-3 rounded-xl bg-emerald-50 text-emerald-950">
                 <div className="text-[10px] uppercase font-bold text-emerald-700">Tổng điểm rèn luyện</div>
-                <div className="text-2xl font-black mt-1">+{activeDetailStudent.monthTotal}đ</div>
+                <div className="text-2xl font-black mt-1">{formatSignedPoints(activeDetailStudent.monthTotal, 'đ')}</div>
               </div>
               <div className="p-3 rounded-xl bg-teal-50 text-teal-950">
                 <div className="text-[10px] uppercase font-bold text-teal-700">Điểm trung bình</div>
@@ -659,7 +659,7 @@ export const IndividualConductModule: React.FC<IndividualConductModuleProps> = (
                         </div>
                       </div>
                       <span className="font-black text-sm">
-                        {t.type === 'plus' ? `+${t.totalPoints}` : `${t.totalPoints}`}đ
+                        {formatSignedPoints(getSignedTransactionPoints(t), 'đ')}
                       </span>
                     </div>
                   ))}

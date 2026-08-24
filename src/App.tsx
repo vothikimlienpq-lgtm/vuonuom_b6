@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ToastProvider, useToast } from './components/Toast';
 import { Header } from './components/Header';
 import { Navigation, ModuleTab } from './components/Navigation';
@@ -32,6 +32,7 @@ function MainAppContent() {
   const [selectedMonth, setSelectedMonth] = useState<number>(initialTime.currentMonth);
   const [selectedWeek, setSelectedWeek] = useState<number>(initialTime.currentWeek);
   const [activeTab, setActiveTab] = useState<ModuleTab>('overview');
+  const hasManualWeekSelection = useRef(false);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -48,8 +49,10 @@ function MainAppContent() {
 
       if (fullData?.config?.week1StartDate) {
         const current = getCurrentWeekAndMonth(fullData.config.week1StartDate);
-        setSelectedWeek(prev => prev === initialTime.currentWeek ? current.currentWeek : prev);
-        setSelectedMonth(prev => prev === initialTime.currentMonth ? current.currentMonth : prev);
+        if (!hasManualWeekSelection.current) {
+          setSelectedWeek(current.currentWeek);
+          setSelectedMonth(current.currentMonth);
+        }
       }
     }, session);
 
@@ -89,8 +92,10 @@ function MainAppContent() {
 
       if (fullData?.config?.week1StartDate) {
         const current = getCurrentWeekAndMonth(fullData.config.week1StartDate);
-        setSelectedWeek(current.currentWeek);
-        setSelectedMonth(current.currentMonth);
+        if (!hasManualWeekSelection.current) {
+          setSelectedWeek(current.currentWeek);
+          setSelectedMonth(current.currentMonth);
+        }
       }
 
     } catch (err: any) {
@@ -103,6 +108,7 @@ function MainAppContent() {
   }, [error, parentLookupCode, verifiedClassId]);
 
   const handleClassVerified = (classId: string) => {
+    hasManualWeekSelection.current = false;
     setData(null);
     setSession(null);
     setParentLookupCode(null);
@@ -111,6 +117,7 @@ function MainAppContent() {
   };
 
   const handleSelectWeek = (week: number) => {
+    hasManualWeekSelection.current = true;
     setSelectedWeek(week);
     if (data?.config?.week1StartDate) {
       const info = getWeekDateRange(data.config.week1StartDate, week);
@@ -119,6 +126,7 @@ function MainAppContent() {
   };
 
   const handleSelectMonth = (month: number) => {
+    hasManualWeekSelection.current = true;
     setSelectedMonth(month);
   };
 
@@ -131,6 +139,7 @@ function MainAppContent() {
       setParentLookupCode(null);
       setShowLoginModal(false);
       setActiveTab('overview');
+      hasManualWeekSelection.current = false;
       success('Đã kết thúc phiên làm việc an toàn.');
     } catch (err: any) {
       error(err.message || 'Lỗi khi đăng xuất');
@@ -153,6 +162,7 @@ function MainAppContent() {
     setData(result.data);
     setSession(result.session);
     setActiveTab('individual_conduct');
+    hasManualWeekSelection.current = false;
     if (result.data.config?.week1StartDate) {
       const current = getCurrentWeekAndMonth(result.data.config.week1StartDate);
       setSelectedWeek(current.currentWeek);

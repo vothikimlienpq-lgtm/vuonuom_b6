@@ -112,7 +112,11 @@ export const HomeworkScheduleModule: React.FC<HomeworkScheduleModuleProps> = ({
   const dayDates = weekInfo.dayDates;
 
   // Filter timetable for current week
-  const currentWeekTimetable = timetable.filter(t => t.week === currentWeek);
+  // Bản ghi cũ chưa có week được hiển thị ở tuần đang hoạt động. Khi giáo viên
+  // bấm sửa và lưu lại, API sẽ tự bổ sung month/week để hoàn tất chuyển đổi.
+  const currentWeekTimetable = timetable.filter(t =>
+    t.week === currentWeek || (!t.week && currentWeek === config.activeWeek)
+  );
 
   // Open modal to edit a period
   const handleOpenEditPeriod = (day: DayOfWeek, period: number) => {
@@ -144,7 +148,7 @@ export const HomeworkScheduleModule: React.FC<HomeworkScheduleModuleProps> = ({
     try {
       const res = await api.saveTimetableEntry({
         id: editingEntry.existing?.id,
-        month: selectedMonth,
+        month: weekInfo.monthNum,
         week: currentWeek,
         dayOfWeek: editingEntry.dayOfWeek,
         period: editingEntry.period,
@@ -169,6 +173,23 @@ export const HomeworkScheduleModule: React.FC<HomeworkScheduleModuleProps> = ({
     }
   };
 
+  const handleDeleteEntry = async (entry: TimetableEntry) => {
+    if (!window.confirm(`Xóa nội dung ${entry.dayOfWeek} - Tiết ${entry.period} (${entry.subject})?`)) return;
+    setSavingEntry(true);
+    try {
+      const res = await api.deleteTimetableEntry(entry.id);
+      if (res.success) {
+        success(res.message);
+        setEditingEntry(null);
+        onRefresh();
+      }
+    } catch (err: any) {
+      error(err.message || 'Lỗi khi xóa tiết học');
+    } finally {
+      setSavingEntry(false);
+    }
+  };
+
   // Copy previous week schedule
   const handleCopyPreviousWeek = async () => {
     if (currentWeek <= 1) {
@@ -183,7 +204,7 @@ export const HomeworkScheduleModule: React.FC<HomeworkScheduleModuleProps> = ({
       const res = await api.copyWeekTimetable({
         sourceWeek: currentWeek - 1,
         targetWeek: currentWeek,
-        month: selectedMonth
+        month: weekInfo.monthNum
       });
       if (res.success) {
         success(res.message);
@@ -244,7 +265,7 @@ export const HomeworkScheduleModule: React.FC<HomeworkScheduleModuleProps> = ({
       }
 
       const res = await api.batchPasteTimetable({
-        month: selectedMonth,
+        month: weekInfo.monthNum,
         week: currentWeek,
         timetableData: entriesToSave
       });
@@ -450,10 +471,15 @@ export const HomeworkScheduleModule: React.FC<HomeworkScheduleModuleProps> = ({
                                 </div>
                               )}
 
-                              {/* Quick hover edit indicator for editors */}
+                              {/* Sửa / xóa nhanh ngay tại mỗi tiết */}
                               {canEdit && (
-                                <div className="opacity-0 group-hover:opacity-100 transition absolute top-1 right-1">
-                                  <Edit3 className="w-3.5 h-3.5 text-emerald-700" />
+                                <div className="opacity-0 group-hover:opacity-100 transition absolute top-1 right-1 flex gap-1">
+                                  <button type="button" onClick={(event) => { event.stopPropagation(); handleOpenEditPeriod(d.key, period); }} className="p-1 rounded bg-white shadow text-emerald-700" title="Sửa tiết học">
+                                    <Edit3 className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button type="button" onClick={(event) => { event.stopPropagation(); handleDeleteEntry(entry); }} className="p-1 rounded bg-white shadow text-rose-600" title="Xóa tiết học">
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
                                 </div>
                               )}
 
@@ -546,8 +572,13 @@ export const HomeworkScheduleModule: React.FC<HomeworkScheduleModuleProps> = ({
                                   )}
 
                                   {canEdit && (
-                                    <div className="opacity-0 group-hover:opacity-100 transition absolute top-1 right-1">
-                                      <Edit3 className="w-3.5 h-3.5 text-emerald-700" />
+                                    <div className="opacity-0 group-hover:opacity-100 transition absolute top-1 right-1 flex gap-1">
+                                      <button type="button" onClick={(event) => { event.stopPropagation(); handleOpenEditPeriod(d.key, period); }} className="p-1 rounded bg-white shadow text-emerald-700" title="Sửa tiết học">
+                                        <Edit3 className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button type="button" onClick={(event) => { event.stopPropagation(); handleDeleteEntry(entry); }} className="p-1 rounded bg-white shadow text-rose-600" title="Xóa tiết học">
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
                                     </div>
                                   )}
                                 </div>
@@ -664,7 +695,7 @@ export const HomeworkScheduleModule: React.FC<HomeworkScheduleModuleProps> = ({
           <div className="bg-white rounded-[28px] max-w-md w-full p-6 shadow-2xl border border-emerald-100">
             <h3 className="text-lg font-black text-emerald-950 mb-1 flex items-center gap-2">
               <BookOpen className="w-5 h-5 text-amber-500" />
-              <span>Ghi Báo Bài & Tiết Học</span>
+              <span>{editingEntry.existing ? 'Chỉnh sửa Báo bài & Tiết học' : 'Ghi Báo Bài & Tiết Học'}</span>
             </h3>
             <p className="text-xs font-bold text-slate-500 mb-4">
               {editingEntry.dayOfWeek} – Tiết {editingEntry.period} ({editingEntry.period <= morningCount ? 'Buổi Sáng' : 'Buổi Chiều'})
@@ -740,7 +771,20 @@ export const HomeworkScheduleModule: React.FC<HomeworkScheduleModuleProps> = ({
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <div className="flex items-center justify-between gap-2 pt-3 border-t border-slate-100">
+                <div>
+                  {editingEntry.existing && (
+                    <button
+                      type="button"
+                      disabled={savingEntry}
+                      onClick={() => handleDeleteEntry(editingEntry.existing!)}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 disabled:opacity-50"
+                    >
+                      <Trash2 className="w-4 h-4" /> Xóa nội dung
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setEditingEntry(null)}
@@ -755,6 +799,7 @@ export const HomeworkScheduleModule: React.FC<HomeworkScheduleModuleProps> = ({
                 >
                   {savingEntry ? 'Đang lưu...' : 'Lưu tiết học'}
                 </button>
+                </div>
               </div>
 
             </form>

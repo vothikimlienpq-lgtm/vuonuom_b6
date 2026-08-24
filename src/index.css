@@ -49,6 +49,16 @@
     border: none !important;
   }
 
+  .page-break {
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .page-break:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
   @page {
     size: A4 portrait;
     margin: 12mm 15mm;

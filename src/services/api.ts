@@ -1020,7 +1020,7 @@ export const api = {
       const safeGroupNumber = Number(payload.groupNumber ?? selectedStudent?.groupNumber);
       const safeRuleContent = String(payload.ruleContent || selectedRule?.content || '').trim();
       const safeType = payload.type || selectedRule?.type;
-      const safePoints = Number(payload.points ?? selectedRule?.defaultPoints);
+      const safePoints = Math.abs(Number(payload.points ?? selectedRule?.defaultPoints));
 
       if (!payload.studentId || !safeStudentName) {
         throw new Error('Không xác định được học sinh. Vui lòng chọn lại học sinh trước khi lưu điểm.');
@@ -1032,8 +1032,9 @@ export const api = {
         throw new Error('Quy định điểm chưa đầy đủ. Vui lòng chọn lại quy định trước khi lưu.');
       }
 
-      const qty = Number(payload.quantity) || 1;
-      const totalPts = safePoints * qty;
+      const qty = Math.max(1, Math.abs(Number(payload.quantity) || 1));
+      const absoluteTotal = safePoints * qty;
+      const totalPts = safeType === 'minus' ? -absoluteTotal : absoluteTotal;
 
       const currentSession = await api.getCurrentSession();
       const newTx: PointTransaction = {
@@ -1086,12 +1087,23 @@ export const api = {
     try {
       const txDocRef = doc(transactionsColRef, id);
       const existing = latestFullData.transactions.find((tx) => tx.id === id);
-      const updateData = withoutUndefined({
+      const merged = { ...(existing || {}), ...payload, id } as PointTransaction;
+      const normalizedPoints = Math.abs(Number(merged.points) || 0);
+      const normalizedQuantity = Math.max(1, Math.abs(Number(merged.quantity) || 1));
+      const normalizedPayload = {
         ...payload,
+        points: normalizedPoints,
+        quantity: normalizedQuantity,
+        totalPoints: merged.type === 'minus'
+          ? -(normalizedPoints * normalizedQuantity)
+          : normalizedPoints * normalizedQuantity,
+      };
+      const updateData = withoutUndefined({
+        ...normalizedPayload,
         updatedAt: new Date().toISOString(),
       });
       await updateDoc(txDocRef, updateData);
-      const updated = { ...(existing || {}), ...payload, id } as PointTransaction;
+      const updated = { ...(existing || {}), ...normalizedPayload, id } as PointTransaction;
       latestFullData.transactions = latestFullData.transactions.map((tx) => tx.id === id ? updated : tx);
       if (existing?.studentId && existing.studentId !== updated.studentId) {
         await safelySyncParentViewForStudent(existing.studentId);
@@ -1546,9 +1558,13 @@ export const api = {
 
   saveTimetableEntry: async (entry: Partial<TimetableEntry>): Promise<{ success: boolean; message: string }> => {
     try {
-      const entryId = entry.id || `TT_${entry.dayOfWeek}_${entry.session || 'morning'}_${entry.period}`;
+      const month = Number(entry.month) || latestFullData.config.activeMonth || 1;
+      const week = Number(entry.week) || latestFullData.config.activeWeek || 1;
+      const entryId = entry.id || `TT_M${month}_W${week}_${entry.dayOfWeek}_${entry.session || 'morning'}_${entry.period}`;
       const fullEntry: TimetableEntry = {
         id: entryId,
+        month,
+        week,
         dayOfWeek: entry.dayOfWeek || 'Thứ 2',
         session: entry.session || 'morning',
         period: entry.period || 1,
@@ -1605,7 +1621,10 @@ export const api = {
         tgtW = toWeek || 2;
       }
 
-      const currentTimetable = latestFullData.timetable;
+      const currentTimetable = latestFullData.timetable.filter(entry => entry.week === srcW);
+      if (currentTimetable.length === 0) {
+        throw new Error(`Tuần ${srcW} chưa có thời khóa biểu để sao chép.`);
+      }
       const batch = writeBatch(db);
       currentTimetable.forEach((entry) => {
         const newId = `TT_M${tgtM}_W${tgtW}_${entry.dayOfWeek}_${entry.session}_${entry.period}`;
@@ -1636,14 +1655,20 @@ export const api = {
   ): Promise<{ success: boolean; message: string }> => {
     try {
       const entries = Array.isArray(arg) ? arg : arg.timetableData || [];
+      const month = Array.isArray(arg) ? undefined : arg.month;
+      const week = Array.isArray(arg) ? undefined : arg.week;
       const batch = writeBatch(db);
       entries.forEach((entry) => {
-        const id = entry.id || `TT_${entry.dayOfWeek}_${entry.session || 'morning'}_${entry.period}`;
-        batch.set(doc(timetableColRef, id), { ...entry, id }, { merge: true });
+        const entryMonth = Number(entry.month || month) || latestFullData.config.activeMonth || 1;
+        const entryWeek = Number(entry.week || week) || latestFullData.config.activeWeek || 1;
+        const session = entry.session || ((Number(entry.period) || 1) <= (Number(latestFullData.config.morningPeriods) || 5) ? 'morning' : 'afternoon');
+        const id = entry.id || `TT_M${entryMonth}_W${entryWeek}_${entry.dayOfWeek}_${session}_${entry.period}`;
+        const normalizedEntry = { ...entry, id, month: entryMonth, week: entryWeek, session };
+        batch.set(doc(timetableColRef, id), normalizedEntry, { merge: true });
         const existing = latestFullData.timetable.find((item) => item.id === id);
         latestFullData.timetable = [
           ...latestFullData.timetable.filter((item) => item.id !== id),
-          { ...(existing || {}), ...entry, id } as TimetableEntry,
+          { ...(existing || {}), ...normalizedEntry } as TimetableEntry,
         ];
       });
       await batch.commit();
@@ -1826,9 +1851,11 @@ export const api = {
     rank: Partial<SchoolRankRecord> & { month?: number; week?: number }
   ): Promise<{ success: boolean; message: string }> => {
     try {
-      const m = rank.month || 8;
-      const w = rank.week || 3;
+      const m = Number(rank.month) || latestFullData.config.activeMonth || 8;
+      const w = Number(rank.week) || latestFullData.config.activeWeek || 1;
       const rankId = rank.id || `RANK_M${m}_W${w}`;
+      const competitionPoints = Number(rank.competitionPoints);
+      const deductedPoints = Math.max(0, Number(rank.deductedPoints) || 0);
       const record: SchoolRankRecord = {
         id: rankId,
         month: m,
@@ -1837,7 +1864,9 @@ export const api = {
         totalSchoolClasses: Number(rank.totalSchoolClasses) || 30,
         gradeRank: Number(rank.gradeRank) || 1,
         totalGradeClasses: Number(rank.totalGradeClasses) || 10,
-        competitionPoints: Number(rank.competitionPoints) || 100,
+        competitionPoints: Number.isFinite(competitionPoints) ? competitionPoints : Math.max(0, 100 - deductedPoints),
+        deductedPoints,
+        deductionReason: String(rank.deductionReason || rank.note || '').trim(),
         updatedDate: rank.updatedDate || new Date().toISOString().split('T')[0],
         note: rank.note || '',
       };

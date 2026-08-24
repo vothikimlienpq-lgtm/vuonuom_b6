@@ -28,6 +28,22 @@ export interface StudentScoreSummary {
   totalMinusPoints: number;
 }
 
+/**
+ * Chuẩn hóa dấu điểm cho cả dữ liệu mới và dữ liệu cũ. Một số bản ghi cũ
+ * lưu điểm trừ dưới dạng số dương, vì vậy loại giao dịch quyết định dấu.
+ */
+export function getSignedTransactionPoints(transaction: PointTransaction): number {
+  const rawTotal = Number(transaction.totalPoints);
+  const fallbackTotal = Number(transaction.points || 0) * Number(transaction.quantity || 1);
+  const absoluteTotal = Math.abs(Number.isFinite(rawTotal) ? rawTotal : fallbackTotal);
+  return transaction.type === 'minus' ? -absoluteTotal : absoluteTotal;
+}
+
+export function formatSignedPoints(points: number, suffix = ''): string {
+  const safePoints = Number.isFinite(Number(points)) ? Number(points) : 0;
+  return `${safePoints > 0 ? '+' : ''}${safePoints}${suffix}`;
+}
+
 export function computeStudentScores(
   students: Student[] = [],
   transactions: PointTransaction[] = [],
@@ -56,7 +72,7 @@ export function computeStudentScores(
     };
 
     studentTxs.forEach(tx => {
-      const pts = tx.totalPoints;
+      const pts = getSignedTransactionPoints(tx);
       if (tx.week >= 1 && tx.week <= 4) {
         weekScores[tx.week] = (weekScores[tx.week] || 0) + pts;
       }

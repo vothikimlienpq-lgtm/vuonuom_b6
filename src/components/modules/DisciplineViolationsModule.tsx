@@ -14,7 +14,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { FullClassData, Student, PointTransaction } from '../../types';
-import { computeStudentScores } from '../../utils/calculations';
+import { computeStudentScores, formatSignedPoints, getSignedTransactionPoints } from '../../utils/calculations';
 
 interface DisciplineViolationsModuleProps {
   data: FullClassData;
@@ -293,7 +293,7 @@ export const DisciplineViolationsModule: React.FC<DisciplineViolationsModuleProp
                   <div key={t.id} className="p-3 rounded-xl bg-rose-50/60 border border-rose-100 text-xs space-y-1">
                     <div className="flex items-center justify-between font-bold text-rose-900">
                       <span>{t.ruleContent} (x{t.quantity})</span>
-                      <span>{t.totalPoints}đ</span>
+                      <span>{formatSignedPoints(getSignedTransactionPoints(t), 'đ')}</span>
                     </div>
                     <div className="text-[11px] text-slate-600 flex items-center justify-between">
                       <span>{t.dayOfWeek}, Tuần {t.week} {t.reason && `• Lý do: "${t.reason}"`}</span>

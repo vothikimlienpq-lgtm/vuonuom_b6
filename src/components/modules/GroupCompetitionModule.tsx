@@ -12,7 +12,7 @@ import {
   Gift
 } from 'lucide-react';
 import { FullClassData, UserRole } from '../../types';
-import { computeGroupStandings, computeStudentScores } from '../../utils/calculations';
+import { computeGroupStandings, computeStudentScores, formatSignedPoints } from '../../utils/calculations';
 import { api } from '../../services/api';
 import { useToast } from '../Toast';
 
@@ -223,16 +223,16 @@ export const GroupCompetitionModule: React.FC<GroupCompetitionModuleProps> = ({
                         {g.memberCount} HS
                       </td>
                       <td className="p-3 text-center font-semibold text-slate-700">
-                        +{g.weekScores[1] || 0}đ
+                        {formatSignedPoints(g.weekScores[1] || 0, 'đ')}
                       </td>
                       <td className="p-3 text-center font-semibold text-slate-700">
-                        +{g.weekScores[2] || 0}đ
+                        {formatSignedPoints(g.weekScores[2] || 0, 'đ')}
                       </td>
                       <td className="p-3 text-center font-semibold text-slate-700">
-                        +{g.weekScores[3] || 0}đ
+                        {formatSignedPoints(g.weekScores[3] || 0, 'đ')}
                       </td>
                       <td className="p-3 text-center font-semibold text-slate-700">
-                        +{g.weekScores[4] || 0}đ
+                        {formatSignedPoints(g.weekScores[4] || 0, 'đ')}
                       </td>
                       <td className="p-3 text-center font-bold text-slate-800">
                         {g.memberPointsTotal}đ
@@ -269,7 +269,7 @@ export const GroupCompetitionModule: React.FC<GroupCompetitionModuleProps> = ({
                                   <div className="text-[10px] text-slate-500">{m.position}</div>
                                 </div>
                                 <div className="text-right">
-                                  <div className="font-black text-emerald-800">+{m.monthTotal}đ</div>
+                                  <div className="font-black text-emerald-800">{formatSignedPoints(m.monthTotal, 'đ')}</div>
                                   <div className="text-[10px] text-slate-500">XL: {m.conductRank}</div>
                                 </div>
                               </div>
