@@ -66,6 +66,7 @@ export interface PointRule {
   category: 'conduct' | 'academic' | 'attendance' | 'task';
   maxPerWeek?: number;
   isActive: boolean;
+  isDeleted?: boolean; // Dấu xóa cho quy định chuẩn được hợp nhất ở phía máy khách
 }
 
 export interface PointTransaction {

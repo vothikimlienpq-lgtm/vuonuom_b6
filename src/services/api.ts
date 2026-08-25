@@ -51,6 +51,7 @@ import {
   WeekLock,
   ParentViewDocument,
 } from '../types';
+import { mergePointRules } from '../utils/ruleUtils';
 
 // Root class document reference
 let activeClassId = DEFAULT_CLASS_ID;
@@ -656,14 +657,11 @@ export const api = {
       const unsubRules = onSnapshot(
         rulesColRef,
         (snap) => {
-          if (!snap.empty) {
-            contextData.rules = snap.docs.map((d) => ({
-              id: d.id,
-              ...d.data(),
-            })) as PointRule[];
-          } else {
-            contextData.rules = DEFAULT_RULES.map((rule) => ({ ...rule }));
-          }
+          const persistedRules = snap.docs.map((d) => ({
+            ...d.data(),
+            id: d.id,
+          })) as PointRule[];
+          contextData.rules = mergePointRules(DEFAULT_RULES, persistedRules);
           notifyUpdate();
         },
         (err) => console.warn('Rules snapshot error:', err)
@@ -1010,7 +1008,18 @@ export const api = {
 
   deleteRule: async (id: string): Promise<{ success: boolean; message: string }> => {
     try {
-      await deleteDoc(doc(rulesColRef, id));
+      const defaultRule = DEFAULT_RULES.find((rule) => rule.id === id);
+      if (defaultRule) {
+        // Quy định chuẩn luôn tồn tại trong gói mã nguồn, vì vậy ghi một dấu
+        // xóa lên Firestore để lần hợp nhất sau không tự phục hồi quy định đó.
+        await setDoc(doc(rulesColRef, id), {
+          ...defaultRule,
+          isActive: false,
+          isDeleted: true,
+        });
+      } else {
+        await deleteDoc(doc(rulesColRef, id));
+      }
       return { success: true, message: 'Đã xóa quy định thi đua thành công.' };
     } catch (err) {
       handleFirestoreError(err, OperationType.DELETE, `pointRules/${id}`);

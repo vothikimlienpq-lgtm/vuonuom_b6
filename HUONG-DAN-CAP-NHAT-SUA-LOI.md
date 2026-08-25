@@ -17,6 +17,11 @@
     - Mức học kỳ là gợi ý theo dữ liệu theo dõi tháng và được đánh dấu **Tạm** khi học kỳ chưa kết thúc.
     - Mức cả năm được tính theo đúng tổ hợp HKI–HKII tại Điều 8 Thông tư 22/2021/TT-BGDĐT.
     - Giao diện ghi rõ kết quả gợi ý không thay thế nhận xét và quyết định chuyên môn của GVCN.
+11. Danh mục quy định được hợp nhất an toàn giữa 30 quy định chuẩn và dữ liệu Firestore:
+    - Thêm quy định mới không còn làm mất các quy định cũ.
+    - Quy định đã lưu trùng mã sẽ cập nhật đúng bản ghi tương ứng, không tạo bản sao.
+    - Xóa quy định chuẩn không làm quy định đó tự xuất hiện lại sau khi tải trang.
+    - Quy định tự thêm được nối sau danh sách chuẩn và vẫn xóa bình thường.
 
 ## Cách kiểm tra trên máy
 
@@ -36,6 +41,7 @@ Sau đó mở địa chỉ Vite hiển thị trong Terminal và kiểm tra lần
 - Dùng nút **Ghi cho cả lớp** hoặc **Ghi cho Tổ ...**.
 - Ghi một tiết trong mục Báo bài & Thời khóa biểu, sau đó thử sửa và xóa.
 - Vào Cài đặt → Danh mục quy chế điểm → Thêm quy định mới; kiểm tra quy định xuất hiện trong danh sách và có thể chọn khi ghi điểm.
+- Sau khi thêm quy định mới, xác nhận toàn bộ quy định chuẩn vẫn còn; tải lại trang và kiểm tra danh sách không bị thay thế.
 - Vào Cài đặt → Thông tin lớp, nhập tổng số tuần và số tuần HKI rồi lưu; mở Rèn luyện cá nhân → Học kỳ & Cả năm để kiểm tra phạm vi tuần và kết quả tổng hợp.
 - Mở bản xem trước phiếu học sinh và kiểm tra tên học sinh, tên GVCN.
 
