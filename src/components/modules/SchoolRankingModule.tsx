@@ -21,6 +21,7 @@ interface SchoolRankingModuleProps {
   selectedMonth: number;
   selectedWeek: number;
   onRefresh: () => void;
+  onSelectWeek?: (week: number) => void;
   userRole?: UserRole;
 }
 
@@ -29,6 +30,7 @@ export const SchoolRankingModule: React.FC<SchoolRankingModuleProps> = ({
   selectedMonth,
   selectedWeek,
   onRefresh,
+  onSelectWeek,
   userRole = 'guest',
 }) => {
   const { success, error } = useToast();
@@ -45,6 +47,13 @@ export const SchoolRankingModule: React.FC<SchoolRankingModuleProps> = ({
 
   const isGvcn = userRole === 'gvcn';
   const rankings = data.schoolRankings || [];
+  const totalWeeks = Math.max(4, Number(data.config.totalWeeks) || 4);
+  const monthWeeks = Array.from({ length: totalWeeks }, (_, index) => index + 1)
+    .filter(week => getWeekDateRange(data.config.week1StartDate, week).monthNum === selectedMonth);
+  const selectedWeekMonth = getWeekDateRange(data.config.week1StartDate, selectedWeek).monthNum;
+  const selectedRank = rankings.find(
+    record => record.week === selectedWeek && record.month === selectedWeekMonth
+  );
 
   const openUpdateModal = () => {
     const existing = rankings.find(record => record.month === selectedMonth && record.week === selectedWeek);
@@ -79,6 +88,7 @@ export const SchoolRankingModule: React.FC<SchoolRankingModuleProps> = ({
         success(res.message);
         setShowAddModal(false);
         setNote('');
+        onSelectWeek?.(modalWeek);
         onRefresh();
       }
     } catch (err: any) {
@@ -100,9 +110,6 @@ export const SchoolRankingModule: React.FC<SchoolRankingModuleProps> = ({
       error(err.message);
     }
   };
-
-  // Latest ranking record
-  const latestRank = rankings[0];
 
   return (
     <div className="space-y-6">
@@ -133,18 +140,77 @@ export const SchoolRankingModule: React.FC<SchoolRankingModuleProps> = ({
         )}
       </div>
 
-      {/* Latest Standing KPI Cards */}
-      {latestRank && (
+      {/* Week selector */}
+      <div className="bg-white rounded-[24px] p-4 sm:p-5 shadow-sm border border-emerald-100">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+          <div>
+            <h3 className="text-sm sm:text-base font-black text-emerald-950 flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-amber-500" />
+              <span>Chọn tuần cần xem</span>
+            </h3>
+            <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">
+              Bấm trực tiếp vào tuần để xem đúng kết quả thứ hạng và điểm bị trừ.
+            </p>
+          </div>
+          <div className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-full self-start sm:self-auto">
+            Tháng {selectedMonth} • Đang xem Tuần {selectedWeek}
+          </div>
+        </div>
+
+        {monthWeeks.length > 0 ? (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            {monthWeeks.map(week => {
+              const weekMonth = getWeekDateRange(data.config.week1StartDate, week).monthNum;
+              const hasData = rankings.some(record => record.week === week && record.month === weekMonth);
+              const isActive = selectedWeek === week;
+
+              return (
+                <button
+                  key={week}
+                  type="button"
+                  onClick={() => onSelectWeek?.(week)}
+                  className={`min-h-[52px] px-4 py-3 rounded-2xl border-2 font-black text-sm transition-all active:scale-[0.98] flex items-center justify-center gap-2 ${
+                    isActive
+                      ? 'bg-amber-400 border-amber-400 text-emerald-950 shadow-md'
+                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:border-emerald-400 hover:bg-emerald-50'
+                  }`}
+                  aria-pressed={isActive}
+                >
+                  <span>Tuần {week}</span>
+                  <span
+                    className={`w-2.5 h-2.5 rounded-full ${
+                      hasData ? 'bg-emerald-500' : 'bg-slate-300'
+                    }`}
+                    title={hasData ? 'Đã cập nhật dữ liệu' : 'Chưa cập nhật dữ liệu'}
+                  />
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4 text-sm text-slate-500 text-center">
+            Chưa xác định được các tuần thuộc tháng {selectedMonth}.
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center gap-4 mt-3 text-[11px] text-slate-500 font-medium">
+          <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />Đã cập nhật</span>
+          <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-slate-300" />Chưa cập nhật</span>
+        </div>
+      </div>
+
+      {/* Selected week standing KPI cards */}
+      {selectedRank ? (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           
           <div className="bg-white rounded-[24px] p-6 border border-emerald-100 shadow-sm flex items-center justify-between">
             <div>
               <div className="text-xs font-bold text-slate-500 uppercase">Hạng toàn trường</div>
               <div className="text-3xl sm:text-4xl font-black text-[#064e3b] mt-1">
-                #{latestRank.schoolRank} <span className="text-sm font-semibold text-slate-400">/ {latestRank.totalSchoolClasses} lớp</span>
+                #{selectedRank.schoolRank} <span className="text-sm font-semibold text-slate-400">/ {selectedRank.totalSchoolClasses} lớp</span>
               </div>
               <div className="text-[11px] text-emerald-700 font-bold mt-1">
-                Tuần {latestRank.week} (Tháng {latestRank.month})
+                Tuần {selectedRank.week} (Tháng {selectedRank.month})
               </div>
             </div>
             <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center font-black">
@@ -156,7 +222,7 @@ export const SchoolRankingModule: React.FC<SchoolRankingModuleProps> = ({
             <div>
               <div className="text-xs font-bold text-slate-500 uppercase">Hạng trong Khối 11</div>
               <div className="text-3xl sm:text-4xl font-black text-amber-600 mt-1">
-                #{latestRank.gradeRank} <span className="text-sm font-semibold text-slate-400">/ {latestRank.totalGradeClasses} lớp</span>
+                #{selectedRank.gradeRank} <span className="text-sm font-semibold text-slate-400">/ {selectedRank.totalGradeClasses} lớp</span>
               </div>
               <div className="text-[11px] text-slate-500 font-medium mt-1">
                 Top dẫn đầu khối 11
@@ -171,10 +237,10 @@ export const SchoolRankingModule: React.FC<SchoolRankingModuleProps> = ({
             <div>
               <div className="text-xs font-bold text-slate-500 uppercase">Điểm lớp bị trừ trong tuần</div>
               <div className="text-3xl sm:text-4xl font-black text-emerald-700 mt-1">
-                −{latestRank.deductedPoints ?? Math.max(0, 100 - latestRank.competitionPoints)} <span className="text-sm font-semibold text-slate-400">điểm</span>
+                −{selectedRank.deductedPoints ?? Math.max(0, 100 - selectedRank.competitionPoints)} <span className="text-sm font-semibold text-slate-400">điểm</span>
               </div>
               <div className="text-[11px] text-slate-500 font-medium mt-1 truncate max-w-[200px]">
-                {latestRank.deductionReason || latestRank.note || 'Không bị trừ điểm'}
+                {selectedRank.deductionReason || selectedRank.note || 'Không bị trừ điểm'}
               </div>
             </div>
             <div className="w-12 h-12 rounded-2xl bg-teal-100 text-teal-800 flex items-center justify-center font-black">
@@ -182,6 +248,16 @@ export const SchoolRankingModule: React.FC<SchoolRankingModuleProps> = ({
             </div>
           </div>
 
+        </div>
+      ) : (
+        <div className="bg-white rounded-[24px] p-7 shadow-sm border border-dashed border-slate-300 text-center">
+          <Calendar className="w-9 h-9 text-slate-300 mx-auto mb-2" />
+          <div className="font-black text-emerald-950">Tuần {selectedWeek} chưa có dữ liệu thứ hạng</div>
+          <p className="text-xs text-slate-500 mt-1">
+            {isGvcn
+              ? 'Bấm “Cập nhật thứ hạng” để nhập kết quả cho tuần đang xem.'
+              : 'Giáo viên chủ nhiệm chưa cập nhật kết quả của tuần này.'}
+          </p>
         </div>
       )}
 

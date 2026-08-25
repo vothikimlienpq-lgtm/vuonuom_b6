@@ -267,6 +267,7 @@ function MainAppContent() {
                 selectedMonth={selectedMonth}
                 selectedWeek={selectedWeek}
                 onRefresh={() => fetchData(true)}
+                onSelectWeek={handleSelectWeek}
                 userRole={session?.role || 'guest'}
               />
             )}
