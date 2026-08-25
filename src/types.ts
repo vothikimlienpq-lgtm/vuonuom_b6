@@ -8,6 +8,7 @@ export interface ClassConfig {
   className: string;
   schoolName: string;
   educationDepartment?: string;
+  province?: string;
   academicYear: string;
   teacherName: string;
   themeTitle: string;

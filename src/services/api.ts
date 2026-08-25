@@ -302,6 +302,7 @@ export const createInitialClassConfig = (
     className,
     schoolName: 'Chưa cập nhật',
     educationDepartment: '',
+    province: '',
     academicYear: academicYearFromId(normalizedClassId),
     teacherName: 'Chưa cập nhật',
     themeTitle: `Vườn Ươm ${className}`,

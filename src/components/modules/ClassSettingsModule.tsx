@@ -56,6 +56,7 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
   const [config, setConfig] = useState<ClassConfig>({
     ...currentConfig,
     educationDepartment: currentConfig.educationDepartment || '',
+    province: currentConfig.province || '',
     academicYear: currentConfig.academicYear || '2026 – 2027',
     week1StartDate: currentConfig.week1StartDate || '2026-08-03',
     totalWeeks: currentConfig.totalWeeks || 38,
@@ -72,6 +73,7 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
     setConfig({
       ...data.config,
       educationDepartment: data.config.educationDepartment || '',
+      province: data.config.province || '',
       totalWeeks: data.config.totalWeeks || 38,
       semester1Weeks: data.config.semester1Weeks || 18,
     });
@@ -570,20 +572,38 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Sở Giáo dục và Đào tạo chủ quản
-                  </label>
-                  <input
-                    type="text"
-                    value={config.educationDepartment || ''}
-                    onChange={(e) => setConfig({ ...config, educationDepartment: e.target.value })}
-                    placeholder="Ví dụ: Sở Giáo dục và Đào tạo Quảng Trị"
-                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 outline-none"
-                  />
-                  <p className="text-[11px] text-slate-500 mt-1">
-                    Nội dung này tự động đồng bộ vào phần đầu phiếu in; nếu chưa nhập, phiếu sẽ nhắc “Chưa cập nhật”.
-                  </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Sở Giáo dục và Đào tạo chủ quản
+                    </label>
+                    <input
+                      type="text"
+                      value={config.educationDepartment || ''}
+                      onChange={(e) => setConfig({ ...config, educationDepartment: e.target.value })}
+                      placeholder="Ví dụ: Sở Giáo dục và Đào tạo Quảng Trị"
+                      className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 outline-none"
+                    />
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      Tự động đồng bộ vào phần đầu phiếu in.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Tỉnh/Thành phố
+                    </label>
+                    <input
+                      type="text"
+                      value={config.province || ''}
+                      onChange={(e) => setConfig({ ...config, province: e.target.value })}
+                      placeholder="Ví dụ: Quảng Trị"
+                      className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 outline-none"
+                    />
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      Hiển thị trước ngày ký trên phiếu in.
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -813,7 +833,7 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
                     {config.schoolName || 'THPT Kim Liên'} • GVCN: {config.teacherName || 'Cô Kim Liên'}
                   </div>
                   <div className="text-[10px] text-emerald-200/80 mt-0.5">
-                    {config.educationDepartment || 'Sở GDĐT: Chưa cập nhật'}
+                    {config.educationDepartment || 'Sở GDĐT: Chưa cập nhật'} • {config.province || 'Tỉnh/TP: Chưa cập nhật'}
                   </div>
                 </div>
               </div>

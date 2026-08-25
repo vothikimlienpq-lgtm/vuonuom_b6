@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Printer, X, Download, Sprout, School, UserCheck } from 'lucide-react';
 import { Student, FullClassData } from '../types';
 import { computeStudentScores, formatSignedPoints, getSignedTransactionPoints } from '../utils/calculations';
@@ -12,16 +12,6 @@ interface ParentReportPrintModalProps {
   selectedWeek: number;
 }
 
-const getDepartmentLocation = (department: string): string => {
-  const cleaned = department.trim();
-  if (!cleaned) return '........';
-  const fullNameMatch = cleaned.match(/đào\s*tạo\s+(.+)$/iu);
-  const shortNameMatch = cleaned.match(/gd\s*(?:&|và)?\s*đt\s+(.+)$/iu);
-  return (fullNameMatch?.[1] || shortNameMatch?.[1] || cleaned)
-    .replace(/^tp\.?\s*/iu, '')
-    .trim() || '........';
-};
-
 export const ParentReportPrintModal: React.FC<ParentReportPrintModalProps> = ({
   isOpen,
   onClose,
@@ -30,6 +20,12 @@ export const ParentReportPrintModal: React.FC<ParentReportPrintModalProps> = ({
   selectedMonth,
   selectedWeek,
 }) => {
+  const [printDate, setPrintDate] = useState(() => new Date());
+
+  useEffect(() => {
+    if (isOpen) setPrintDate(new Date());
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const allStudents = data.students || [];
@@ -42,18 +38,19 @@ export const ParentReportPrintModal: React.FC<ParentReportPrintModalProps> = ({
     : String(config.className || '').toUpperCase() === '11B6'
       ? 'Cô Võ Thị Kim Liên'
       : 'Chưa cập nhật tên GVCN';
-  const academicYears = String(config.academicYear || '').match(/20\d{2}/g);
-  const reportYear = academicYears?.[academicYears.length - 1] || new Date().getFullYear();
   const educationDepartment = String(config.educationDepartment || '').trim();
   const educationDepartmentForPrint = educationDepartment
     ? educationDepartment.toLocaleUpperCase('vi-VN')
     : 'SỞ GIÁO DỤC VÀ ĐÀO TẠO: CHƯA CẬP NHẬT';
-  const reportLocation = getDepartmentLocation(educationDepartment);
+  const province = String(config.province || '').trim() || 'CHƯA CẬP NHẬT TỈNH/THÀNH PHỐ';
 
   const studentSummaries = computeStudentScores(allStudents, allTransactions, selectedMonth);
 
   const handlePrint = () => {
-    window.print();
+    setPrintDate(new Date());
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => window.print());
+    });
   };
 
   return (
@@ -269,7 +266,7 @@ export const ParentReportPrintModal: React.FC<ParentReportPrintModalProps> = ({
 
                 <div>
                   <div className="text-[11px] text-slate-500 italic mb-1">
-                    {reportLocation}, ngày ..... tháng ..... năm {reportYear}
+                    {province}, ngày {printDate.getDate()} tháng {printDate.getMonth() + 1} năm {printDate.getFullYear()}
                   </div>
                   <div className="font-bold text-slate-800 uppercase">GIÁO VIÊN CHỦ NHIỆM</div>
                   <div className="text-[10px] text-slate-400 italic mt-0.5">(Ký và ghi rõ họ tên)</div>
