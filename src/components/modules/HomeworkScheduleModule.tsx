@@ -60,6 +60,7 @@ export const HomeworkScheduleModule: React.FC<HomeworkScheduleModuleProps> = ({
   const totalPeriods = Number(config.periodsPerDay) || 8;
   const morningCount = Number(config.morningPeriods) || 5;
   const afternoonCount = Math.max(0, totalPeriods - morningCount);
+  const usesSplitPeriodNumbering = config.scheduleStructure === 'split10';
 
   const timetable = data.timetable || [];
   const homeworkList = data.homeworkTasks || [];
@@ -86,6 +87,7 @@ export const HomeworkScheduleModule: React.FC<HomeworkScheduleModuleProps> = ({
   const [editingEntry, setEditingEntry] = useState<{
     dayOfWeek: DayOfWeek;
     period: number;
+    session: 'morning' | 'afternoon';
     existing?: TimetableEntry;
   } | null>(null);
 
@@ -118,11 +120,34 @@ export const HomeworkScheduleModule: React.FC<HomeworkScheduleModuleProps> = ({
     t.week === currentWeek || (!t.week && currentWeek === config.activeWeek)
   );
 
+  const getEntrySession = (entry: TimetableEntry): 'morning' | 'afternoon' => (
+    entry.session || (entry.period <= morningCount ? 'morning' : 'afternoon')
+  );
+
+  const getEntryDisplayPeriod = (entry: TimetableEntry): number => {
+    const session = getEntrySession(entry);
+    if (session === 'morning') return entry.period;
+    if (usesSplitPeriodNumbering) {
+      return entry.period > morningCount ? entry.period - morningCount : entry.period;
+    }
+    return entry.period <= morningCount ? entry.period + morningCount : entry.period;
+  };
+
+  const findTimetableEntry = (
+    day: DayOfWeek,
+    period: number,
+    session: 'morning' | 'afternoon'
+  ) => currentWeekTimetable.find((entry) => (
+    entry.dayOfWeek === day
+    && getEntrySession(entry) === session
+    && getEntryDisplayPeriod(entry) === period
+  ));
+
   // Open modal to edit a period
-  const handleOpenEditPeriod = (day: DayOfWeek, period: number) => {
+  const handleOpenEditPeriod = (day: DayOfWeek, period: number, session: 'morning' | 'afternoon') => {
     if (!canEdit) return;
-    const existing = currentWeekTimetable.find(t => t.dayOfWeek === day && t.period === period);
-    setEditingEntry({ dayOfWeek: day, period, existing });
+    const existing = findTimetableEntry(day, period, session);
+    setEditingEntry({ dayOfWeek: day, period, session, existing });
     if (existing) {
       setFormSubject(existing.subject || '');
       setFormLessonName(existing.lessonName || '');
@@ -157,7 +182,7 @@ export const HomeworkScheduleModule: React.FC<HomeworkScheduleModuleProps> = ({
         week: currentWeek,
         dayOfWeek: editingEntry.dayOfWeek,
         period: editingEntry.period,
-        session: editingEntry.period <= morningCount ? 'morning' : 'afternoon',
+        session: editingEntry.session,
         subject,
         lessonName: formLessonName,
         homework: formHomework,
@@ -179,7 +204,8 @@ export const HomeworkScheduleModule: React.FC<HomeworkScheduleModuleProps> = ({
   };
 
   const handleDeleteEntry = async (entry: TimetableEntry) => {
-    if (!window.confirm(`Xóa nội dung ${entry.dayOfWeek} - Tiết ${entry.period} (${entry.subject})?`)) return;
+    const sessionLabel = getEntrySession(entry) === 'morning' ? 'Sáng' : 'Chiều';
+    if (!window.confirm(`Xóa nội dung ${entry.dayOfWeek} - ${sessionLabel}, Tiết ${getEntryDisplayPeriod(entry)} (${entry.subject})?`)) return;
     setSavingEntry(true);
     try {
       const res = await api.deleteTimetableEntry(entry.id);
@@ -247,15 +273,24 @@ export const HomeworkScheduleModule: React.FC<HomeworkScheduleModuleProps> = ({
           else if (dStr.includes('6') || dStr.includes('sáu') || dStr.includes('sau')) day = 'Thứ 6';
           else if (dStr.includes('7') || dStr.includes('bảy') || dStr.includes('bay')) day = 'Thứ 7';
 
-          const period = parseInt(parts[1]) || 1;
-          const subject = parts[2] || 'Chào cờ';
-          const homework = parts[3] || '';
-          const materials = parts[4] || '';
-          const tag = parts[5] || 'Bình thường';
+          const hasSessionColumn = usesSplitPeriodNumbering && /sáng|sang|chiều|chieu/i.test(parts[1] || '');
+          const session: 'morning' | 'afternoon' = hasSessionColumn && /chiều|chieu/i.test(parts[1])
+            ? 'afternoon'
+            : 'morning';
+          const periodIndex = hasSessionColumn ? 2 : 1;
+          const period = parseInt(parts[periodIndex]) || 1;
+          const inferredSession: 'morning' | 'afternoon' = hasSessionColumn
+            ? session
+            : period <= morningCount ? 'morning' : 'afternoon';
+          const subject = parts[periodIndex + 1] || 'Chào cờ';
+          const homework = parts[periodIndex + 2] || '';
+          const materials = parts[periodIndex + 3] || '';
+          const tag = parts[periodIndex + 4] || 'Bình thường';
 
           entriesToSave.push({
             dayOfWeek: day,
             period,
+            session: inferredSession,
             subject,
             homework,
             materials,
@@ -419,12 +454,12 @@ export const HomeworkScheduleModule: React.FC<HomeworkScheduleModuleProps> = ({
 
                     {/* Day Columns */}
                     {DAYS_OF_WEEK.map((d) => {
-                      const entry = currentWeekTimetable.find(t => t.dayOfWeek === d.key && t.period === period);
+                      const entry = findTimetableEntry(d.key, period, 'morning');
                       
                       return (
                         <td 
                           key={d.key} 
-                          onClick={() => handleOpenEditPeriod(d.key, period)}
+                          onClick={() => handleOpenEditPeriod(d.key, period, 'morning')}
                           className={`p-2.5 border-r border-slate-100 last:border-r-0 align-top transition relative group ${
                             canEdit ? 'cursor-pointer hover:bg-emerald-50/40' : ''
                           }`}
@@ -479,7 +514,7 @@ export const HomeworkScheduleModule: React.FC<HomeworkScheduleModuleProps> = ({
                               {/* Sửa / xóa nhanh ngay tại mỗi tiết */}
                               {canEdit && (
                                 <div className="opacity-0 group-hover:opacity-100 transition absolute top-1 right-1 flex gap-1">
-                                  <button type="button" onClick={(event) => { event.stopPropagation(); handleOpenEditPeriod(d.key, period); }} className="p-1 rounded bg-white shadow text-emerald-700" title="Sửa tiết học">
+                                  <button type="button" onClick={(event) => { event.stopPropagation(); handleOpenEditPeriod(d.key, period, 'morning'); }} className="p-1 rounded bg-white shadow text-emerald-700" title="Sửa tiết học">
                                     <Edit3 className="w-3.5 h-3.5" />
                                   </button>
                                   <button type="button" onClick={(event) => { event.stopPropagation(); handleDeleteEntry(entry); }} className="p-1 rounded bg-white shadow text-rose-600" title="Xóa tiết học">
@@ -512,13 +547,13 @@ export const HomeworkScheduleModule: React.FC<HomeworkScheduleModuleProps> = ({
                   <>
                     <tr className="bg-amber-50/80 border-y border-amber-200/80">
                       <td colSpan={7} className="p-2.5 px-4 text-xs font-black text-amber-950 tracking-wide uppercase">
-                        🌆 BUỔI CHIỀU (TIẾT {morningCount + 1} – {totalPeriods})
+                        🌆 BUỔI CHIỀU (TIẾT {usesSplitPeriodNumbering ? 1 : morningCount + 1} – {usesSplitPeriodNumbering ? afternoonCount : totalPeriods})
                       </td>
                     </tr>
 
                     {/* Afternoon Period Rows */}
-                    {Array.from({ length: afternoonCount }, (_, i) => morningCount + 1 + i).map((period) => (
-                      <tr key={period} className="border-b border-slate-100 hover:bg-slate-50/50 transition">
+                    {Array.from({ length: afternoonCount }, (_, i) => (usesSplitPeriodNumbering ? 1 : morningCount + 1) + i).map((period) => (
+                      <tr key={`afternoon-${period}`} className="border-b border-slate-100 hover:bg-slate-50/50 transition">
                         
                         {/* Period Column */}
                         <td className="p-3 text-center bg-slate-50/80 border-r border-slate-200">
@@ -528,12 +563,12 @@ export const HomeworkScheduleModule: React.FC<HomeworkScheduleModuleProps> = ({
 
                         {/* Day Columns */}
                         {DAYS_OF_WEEK.map((d) => {
-                          const entry = currentWeekTimetable.find(t => t.dayOfWeek === d.key && t.period === period);
+                          const entry = findTimetableEntry(d.key, period, 'afternoon');
                           
                           return (
                             <td 
                               key={d.key} 
-                              onClick={() => handleOpenEditPeriod(d.key, period)}
+                              onClick={() => handleOpenEditPeriod(d.key, period, 'afternoon')}
                               className={`p-2.5 border-r border-slate-100 last:border-r-0 align-top transition relative group ${
                                 canEdit ? 'cursor-pointer hover:bg-emerald-50/40' : ''
                               }`}
@@ -578,7 +613,7 @@ export const HomeworkScheduleModule: React.FC<HomeworkScheduleModuleProps> = ({
 
                                   {canEdit && (
                                     <div className="opacity-0 group-hover:opacity-100 transition absolute top-1 right-1 flex gap-1">
-                                      <button type="button" onClick={(event) => { event.stopPropagation(); handleOpenEditPeriod(d.key, period); }} className="p-1 rounded bg-white shadow text-emerald-700" title="Sửa tiết học">
+                                      <button type="button" onClick={(event) => { event.stopPropagation(); handleOpenEditPeriod(d.key, period, 'afternoon'); }} className="p-1 rounded bg-white shadow text-emerald-700" title="Sửa tiết học">
                                         <Edit3 className="w-3.5 h-3.5" />
                                       </button>
                                       <button type="button" onClick={(event) => { event.stopPropagation(); handleDeleteEntry(entry); }} className="p-1 rounded bg-white shadow text-rose-600" title="Xóa tiết học">
@@ -648,7 +683,7 @@ export const HomeworkScheduleModule: React.FC<HomeworkScheduleModuleProps> = ({
                   {/* Header of Item */}
                   <div className="flex items-center justify-between gap-1">
                     <div className="font-black text-xs text-slate-900">
-                      {item.dayOfWeek} – Tiết {item.period} ({item.subject})
+                      {item.dayOfWeek} – {getEntrySession(item) === 'morning' ? 'Sáng' : 'Chiều'}, Tiết {getEntryDisplayPeriod(item)} ({item.subject})
                     </div>
 
                     {item.tag && item.tag !== 'Bình thường' && (
@@ -703,7 +738,7 @@ export const HomeworkScheduleModule: React.FC<HomeworkScheduleModuleProps> = ({
               <span>{editingEntry.existing ? 'Chỉnh sửa Báo bài & Tiết học' : 'Ghi Báo Bài & Tiết Học'}</span>
             </h3>
             <p className="text-xs font-bold text-slate-500 mb-4">
-              {editingEntry.dayOfWeek} – Tiết {editingEntry.period} ({editingEntry.period <= morningCount ? 'Buổi Sáng' : 'Buổi Chiều'})
+              {editingEntry.dayOfWeek} – Tiết {editingEntry.period} ({editingEntry.session === 'morning' ? 'Buổi Sáng' : 'Buổi Chiều'})
             </p>
 
             <form onSubmit={handleSaveEntry} className="space-y-3.5">
@@ -831,14 +866,18 @@ export const HomeworkScheduleModule: React.FC<HomeworkScheduleModuleProps> = ({
             <p className="text-xs text-slate-600 leading-relaxed">
               Dán dữ liệu từ bảng Excel hoặc danh sách theo mẫu. Cấu trúc mỗi dòng: <br/>
               <code className="text-emerald-800 font-mono font-bold bg-emerald-50 px-1 py-0.5 rounded">
-                Thứ [tab] Tiết [tab] Tên Môn [tab] BTVN [tab] Mang theo [tab] Nhãn
+                {usesSplitPeriodNumbering
+                  ? 'Thứ [tab] Buổi [tab] Tiết [tab] Tên Môn [tab] BTVN [tab] Mang theo [tab] Nhãn'
+                  : 'Thứ [tab] Tiết [tab] Tên Môn [tab] BTVN [tab] Mang theo [tab] Nhãn'}
               </code>
             </p>
 
             <textarea
               value={batchText}
               onChange={(e) => setBatchText(e.target.value)}
-              placeholder={`Thứ 2\t1\tChào cờ\t\t\nThứ 2\t2\tTiếng Anh\tHọc 16 từ vựng unit 1\tTài liệu, tập kẹp\tMANG TÀI LIỆU\nThứ 3\t1\tToán\tLàm bài tập 1,2,3 trang 50\tThước, compa\tBTVN`}
+              placeholder={usesSplitPeriodNumbering
+                ? `Thứ 2\tSáng\t1\tChào cờ\t\t\nThứ 2\tChiều\t1\tTiếng Anh\tHọc 16 từ vựng unit 1\tTài liệu, tập kẹp\tMANG TÀI LIỆU`
+                : `Thứ 2\t1\tChào cờ\t\t\nThứ 2\t2\tTiếng Anh\tHọc 16 từ vựng unit 1\tTài liệu, tập kẹp\tMANG TÀI LIỆU\nThứ 3\t1\tToán\tLàm bài tập 1,2,3 trang 50\tThước, compa\tBTVN`}
               rows={8}
               className="w-full p-3 rounded-xl border border-slate-300 text-xs font-mono bg-slate-50"
             />

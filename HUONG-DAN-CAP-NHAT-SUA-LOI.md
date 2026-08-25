@@ -27,6 +27,7 @@
 14. Cài đặt lớp có thêm ô **Sở Giáo dục và Đào tạo chủ quản** và **Tỉnh/Thành phố**; phần đầu phiếu in lấy tên Sở, còn địa danh ký lấy đúng tỉnh/thành phố giáo viên đã nhập, không còn ghi cứng Hà Nội.
 15. Mục **Đổi mật khẩu** hỗ trợ cả GVCN, Ban cán sự và Thành viên lớp. Với tài khoản BCS/Thành viên, hệ thống yêu cầu mật khẩu hiện tại trước khi đổi và chỉ thao tác trên tài khoản đang hoạt động của đúng lớp.
 16. Ngày, tháng, năm trên phiếu in tự động cập nhật theo đúng ngày giáo viên bấm **In ngay**.
+17. Cấu hình thời khóa biểu có thêm lựa chọn **10 tiết (Sáng 1–5 + Chiều 1–5)**. Hệ thống phân biệt tiết sáng/chiều bằng buổi học nên không ghi đè hai tiết có cùng số; dữ liệu kiểu cũ 6–10 vẫn được đọc tương thích.
 
 ## Cách kiểm tra trên máy
 
@@ -51,6 +52,7 @@ Sau đó mở địa chỉ Vite hiển thị trong Terminal và kiểm tra lần
 - Chọn một tháng cũ ngay trong bảng xếp hạng tổ và xác nhận số liệu đổi đúng tháng.
 - Vào Cài đặt lớp, nhập Sở GDĐT và Tỉnh/Thành phố; mở phiếu in để kiểm tra phần đầu phiếu, địa danh và ngày ký hiện tại.
 - Vào Đổi mật khẩu, chọn thử một tài khoản BCS/Thành viên; xác nhận mật khẩu hiện tại sai bị từ chối và mật khẩu đúng cho phép cập nhật.
+- Chọn cấu hình **10 tiết (Sáng 1–5 + Chiều 1–5)**, ghi thử Tiết 1 buổi sáng và Tiết 1 buổi chiều trong cùng ngày; xác nhận hai tiết được lưu và hiển thị độc lập.
 - Vào Cài đặt → Thông tin lớp, nhập tổng số tuần và số tuần HKI rồi lưu; mở Rèn luyện cá nhân → Học kỳ & Cả năm để kiểm tra phạm vi tuần và kết quả tổng hợp.
 - Mở bản xem trước phiếu học sinh và kiểm tra tên học sinh, tên GVCN.
 

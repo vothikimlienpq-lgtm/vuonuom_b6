@@ -21,7 +21,7 @@ export interface ClassConfig {
   periodsPerDay?: number; // 5, 8, 10, etc.
   morningPeriods?: number; // default 5
   afternoonPeriods?: number; // default 3
-  scheduleStructure?: 'standard8' | 'standard5' | 'custom';
+  scheduleStructure?: 'standard8' | 'standard5' | 'split10' | 'custom';
   subjects: string[];
   cleaningTasks: string[];
   hasGvcnPassword?: boolean;
@@ -146,7 +146,7 @@ export interface TimetableEntry {
   week?: number;
   dayOfWeek: DayOfWeek;
   session?: 'morning' | 'afternoon';
-  period: number; // 1..5
+  period: number; // Số tiết trong buổi hoặc số tiết liên tục trong ngày, tùy cấu hình
   subject: string;
   teacher?: string;
   lessonName?: string;

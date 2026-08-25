@@ -755,15 +755,16 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
                       Hoặc chọn số tiết cụ thể (1 – 10):
                     </label>
                     <select
-                      value={config.periodsPerDay || 8}
+                      value={config.scheduleStructure === 'split10' ? 'split10' : String(config.periodsPerDay || 8)}
                       onChange={(e) => {
-                        const val = Number(e.target.value);
+                        const isSplit10 = e.target.value === 'split10';
+                        const val = isSplit10 ? 10 : Number(e.target.value);
                         setConfig({
                           ...config,
                           periodsPerDay: val,
                           morningPeriods: Math.min(val, 5),
                           afternoonPeriods: Math.max(0, val - 5),
-                          scheduleStructure: val === 8 ? 'standard8' : val === 5 ? 'standard5' : 'custom'
+                          scheduleStructure: isSplit10 ? 'split10' : val === 8 ? 'standard8' : val === 5 ? 'standard5' : 'custom'
                         });
                       }}
                       className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 bg-white"
@@ -774,6 +775,7 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
                       <option value={7}>7 tiết (Sáng: 1..5 + Chiều: 6, 7)</option>
                       <option value={9}>9 tiết (Sáng: 1..5 + Chiều: 6..9)</option>
                       <option value={10}>10 tiết (Sáng: 1..5 + Chiều: 6..10 - Cả ngày)</option>
+                      <option value="split10">10 tiết (Sáng: 1..5 + Chiều: 1..5 - Cả ngày)</option>
                     </select>
                   </div>
                 </div>
@@ -874,7 +876,9 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
                 <div className="p-2.5 rounded-xl bg-white border border-emerald-100">
                   <div className="text-slate-500 text-[10px] font-bold">Thời khóa biểu / ngày</div>
                   <div className="font-black text-emerald-800 mt-0.5">
-                    {config.periodsPerDay || 8} tiết ({(config.periodsPerDay || 8) > 5 ? 'Sáng & Chiều' : 'Chỉ học sáng'})
+                    {config.scheduleStructure === 'split10'
+                      ? '10 tiết (Sáng 1–5 • Chiều 1–5)'
+                      : `${config.periodsPerDay || 8} tiết (${(config.periodsPerDay || 8) > 5 ? 'Sáng & Chiều' : 'Chỉ học sáng'})`}
                   </div>
                 </div>
               </div>

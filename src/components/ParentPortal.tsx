@@ -24,6 +24,18 @@ export const ParentPortal: React.FC<ParentPortalProps> = ({ session, onLogout })
   }
 
   const homework = view.weeklyHomework;
+  const morningPeriods = Number(view.config?.morningPeriods) || 5;
+  const usesSplitPeriodNumbering = view.config?.scheduleStructure === 'split10';
+  const getTimetablePeriodLabel = (item: { period: number; session?: 'morning' | 'afternoon' }) => {
+    const session = item.session || (item.period <= morningPeriods ? 'morning' : 'afternoon');
+    let displayPeriod = item.period;
+    if (session === 'afternoon' && usesSplitPeriodNumbering && item.period > morningPeriods) {
+      displayPeriod = item.period - morningPeriods;
+    } else if (session === 'afternoon' && !usesSplitPeriodNumbering && item.period <= morningPeriods) {
+      displayPeriod = item.period + morningPeriods;
+    }
+    return `${session === 'morning' ? 'Sáng' : 'Chiều'} – Tiết ${displayPeriod}`;
+  };
 
   return (
     <div className="min-h-screen bg-[#f4f7f5] text-slate-800">
@@ -85,7 +97,7 @@ export const ParentPortal: React.FC<ParentPortalProps> = ({ session, onLogout })
               <div className="mt-4 overflow-x-auto">
                 <table className="w-full min-w-[560px] text-sm">
                   <thead><tr className="bg-emerald-950 text-white"><th className="p-3 text-left">Ngày</th><th className="p-3 text-left">Tiết</th><th className="p-3 text-left">Môn</th><th className="p-3 text-left">Ghi chú</th></tr></thead>
-                  <tbody>{view.timetable.map((item, index) => <tr key={item.id || index} className="border-b"><td className="p-3">{item.dayOfWeek}</td><td className="p-3">{item.period}</td><td className="p-3 font-bold">{item.subject}</td><td className="p-3">{item.note || item.homework || ''}</td></tr>)}</tbody>
+                  <tbody>{view.timetable.map((item, index) => <tr key={item.id || index} className="border-b"><td className="p-3">{item.dayOfWeek}</td><td className="p-3">{getTimetablePeriodLabel(item)}</td><td className="p-3 font-bold">{item.subject}</td><td className="p-3">{item.note || item.homework || ''}</td></tr>)}</tbody>
                 </table>
               </div>
             ) : <p className="mt-3 text-sm text-slate-500">Giáo viên chưa đưa thời khóa biểu vào mã tra cứu này.</p>}
