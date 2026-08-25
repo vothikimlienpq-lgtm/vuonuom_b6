@@ -58,6 +58,7 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
     academicYear: currentConfig.academicYear || '2026 – 2027',
     week1StartDate: currentConfig.week1StartDate || '2026-08-03',
     totalWeeks: currentConfig.totalWeeks || 38,
+    semester1Weeks: currentConfig.semester1Weeks || 18,
     periodsPerDay: currentConfig.periodsPerDay || 8,
     morningPeriods: currentConfig.morningPeriods || 5,
     afternoonPeriods: currentConfig.afternoonPeriods || 3,
@@ -67,7 +68,11 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
   const [savingConfig, setSavingConfig] = useState(false);
 
   useEffect(() => {
-    setConfig({ ...data.config });
+    setConfig({
+      ...data.config,
+      totalWeeks: data.config.totalWeeks || 38,
+      semester1Weeks: data.config.semester1Weeks || 18,
+    });
   }, [data.config.id]);
 
   // Security Form states
@@ -81,10 +86,11 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
   const [newRuleContent, setNewRuleContent] = useState('');
   const [newRuleType, setNewRuleType] = useState<'plus' | 'minus'>('plus');
   const [newRulePoints, setNewRulePoints] = useState<number>(5);
-  const [newRuleCategory, setNewRuleCategory] = useState<'academic' | 'discipline' | 'hygiene' | 'bonus'>('academic');
+  const [newRuleCategory, setNewRuleCategory] = useState<PointRule['category']>('academic');
   const [requiresReason, setRequiresReason] = useState(false);
   const [requiresSubject, setRequiresSubject] = useState(false);
   const [isFlexible, setIsFlexible] = useState(false);
+  const [savingRule, setSavingRule] = useState(false);
 
   // Student Modals & states
   const [showAddStudentModal, setShowAddStudentModal] = useState(false);
@@ -140,6 +146,10 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
         ...config,
         periodsPerDay: Number(config.periodsPerDay) || 8,
         totalWeeks: Number(config.totalWeeks) || 38,
+        semester1Weeks: Math.min(
+          Math.max(1, Number(config.semester1Weeks) || 18),
+          Math.max(1, (Number(config.totalWeeks) || 38) - 1)
+        ),
         morningPeriods: Number(config.morningPeriods) || 5,
         afternoonPeriods: (Number(config.periodsPerDay) || 8) > 5 ? (Number(config.periodsPerDay) || 8) - 5 : 0,
       });
@@ -176,9 +186,20 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
 
   const handleSaveNewRule = async (e: React.FormEvent) => {
     e.preventDefault();
+    const content = newRuleContent.trim();
+    if (!content) {
+      warning('Vui lòng nhập nội dung quy định.');
+      return;
+    }
+    if (!Number.isFinite(newRulePoints) || newRulePoints < 0) {
+      warning('Điểm mặc định phải là số hợp lệ và không nhỏ hơn 0.');
+      return;
+    }
+
+    setSavingRule(true);
     try {
       const res = await api.saveRule({
-        content: newRuleContent,
+        content,
         type: newRuleType,
         defaultPoints: newRulePoints,
         category: newRuleCategory,
@@ -191,10 +212,18 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
         success(res.message);
         setShowAddRuleModal(false);
         setNewRuleContent('');
+        setNewRuleType('plus');
+        setNewRulePoints(5);
+        setNewRuleCategory('academic');
+        setRequiresReason(false);
+        setRequiresSubject(false);
+        setIsFlexible(false);
         onRefresh();
       }
     } catch (err: any) {
-      error(err.message);
+      error(err.message || 'Không thể thêm quy định mới. Vui lòng thử lại.');
+    } finally {
+      setSavingRule(false);
     }
   };
 
@@ -447,9 +476,10 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
                       className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold text-[#064e3b] focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 outline-none"
                     />
                   </div>
+
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
                       Tên Trường <span className="text-rose-500">*</span>
@@ -521,6 +551,24 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
                     />
                     <p className="text-[11px] text-slate-500 mt-1 leading-snug">
                       Chương trình chuẩn gồm 35 – 38 tuần thực học.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      # Số tuần của Học kỳ I <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={Math.max(1, (Number(config.totalWeeks) || 38) - 1)}
+                      value={config.semester1Weeks || 18}
+                      onChange={(e) => setConfig({ ...config, semester1Weeks: Number(e.target.value) })}
+                      required
+                      className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 bg-white"
+                    />
+                    <p className="text-[11px] text-slate-500 mt-1 leading-snug">
+                      HKI: Tuần 1–{config.semester1Weeks || 18}; HKII: các tuần còn lại.
                     </p>
                   </div>
                 </div>
@@ -714,6 +762,13 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
                 <div className="p-2.5 rounded-xl bg-white border border-emerald-100">
                   <div className="text-slate-500 text-[10px] font-bold">Tổng số tuần thực học</div>
                   <div className="font-black text-emerald-800 mt-0.5">{config.totalWeeks || 38} tuần</div>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-white border border-emerald-100">
+                  <div className="text-slate-500 text-[10px] font-bold">Phân chia học kỳ</div>
+                  <div className="font-black text-emerald-800 mt-0.5">
+                    HKI: {config.semester1Weeks || 18} tuần • HKII: {Math.max(1, (config.totalWeeks || 38) - (config.semester1Weeks || 18))} tuần
+                  </div>
                 </div>
 
                 <div className="p-2.5 rounded-xl bg-white border border-emerald-100">
@@ -1415,13 +1470,27 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
                   <label className="block text-xs font-bold text-slate-700 mb-1">Điểm mặc định:</label>
                   <input
                     type="number"
-                    min={1}
+                    min={0}
                     max={100}
                     value={newRulePoints}
                     onChange={(e) => setNewRulePoints(Number(e.target.value))}
                     className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Lĩnh vực áp dụng:</label>
+                <select
+                  value={newRuleCategory}
+                  onChange={(e) => setNewRuleCategory(e.target.value as PointRule['category'])}
+                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold"
+                >
+                  <option value="academic">Học tập</option>
+                  <option value="conduct">Nề nếp</option>
+                  <option value="attendance">Chuyên cần</option>
+                  <option value="task">Nhiệm vụ</option>
+                </select>
               </div>
 
               <div className="space-y-2 pt-2 text-xs text-slate-700">
@@ -1459,16 +1528,18 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
               <div className="flex items-center justify-end gap-2 pt-3">
                 <button
                   type="button"
+                  disabled={savingRule}
                   onClick={() => setShowAddRuleModal(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100"
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 disabled:opacity-50"
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-[#064e3b] text-amber-300 font-bold text-xs shadow"
+                  disabled={savingRule || !newRuleContent.trim()}
+                  className="px-5 py-2 rounded-xl bg-[#064e3b] text-amber-300 font-bold text-xs shadow disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Lưu quy định
+                  {savingRule ? 'Đang lưu...' : 'Lưu quy định'}
                 </button>
               </div>
             </form>

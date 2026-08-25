@@ -8,6 +8,15 @@
 4. Mục thứ hạng trường có nút **Cập nhật thứ hạng**, chọn tuần, nhập điểm bị trừ và lý do.
 5. Báo bài và thời khóa biểu lưu đầy đủ tháng/tuần, hiển thị ngay sau khi ghi, đồng thời có nút sửa và xóa tại từng tiết.
 6. Thanh điều khiển xem trước bản in không còn che tên học sinh; tên GVCN và năm ký được lấy từ cấu hình lớp.
+7. Mục **Thứ hạng trường & khối** có nút chọn trực tiếp từng tuần và hiển thị đúng dữ liệu của tuần đang chọn.
+8. Phần **Báo bài & Thời khóa biểu** cho phép tự nhập tên môn học, không còn phụ thuộc danh sách môn cố định.
+9. Chức năng **Thêm quy định mới** đã sửa lỗi Firestore từ chối trường dữ liệu trống; có kiểm tra nội dung, điểm, lĩnh vực và trạng thái đang lưu rõ ràng.
+10. Mục **Rèn luyện cá nhân** có thêm chế độ **Học kỳ & Cả năm**:
+    - Tổng hợp các tháng đã diễn ra trong từng học kỳ.
+    - Giáo viên cài số tuần của HKI; HKII tự nhận số tuần còn lại.
+    - Mức học kỳ là gợi ý theo dữ liệu theo dõi tháng và được đánh dấu **Tạm** khi học kỳ chưa kết thúc.
+    - Mức cả năm được tính theo đúng tổ hợp HKI–HKII tại Điều 8 Thông tư 22/2021/TT-BGDĐT.
+    - Giao diện ghi rõ kết quả gợi ý không thay thế nhận xét và quyết định chuyên môn của GVCN.
 
 ## Cách kiểm tra trên máy
 
@@ -26,6 +35,8 @@ Sau đó mở địa chỉ Vite hiển thị trong Terminal và kiểm tra lần
 - Nhập một điểm cộng và một điểm trừ cho cùng học sinh; kiểm tra tổng ngày, tổng tuần và tổng tháng.
 - Dùng nút **Ghi cho cả lớp** hoặc **Ghi cho Tổ ...**.
 - Ghi một tiết trong mục Báo bài & Thời khóa biểu, sau đó thử sửa và xóa.
+- Vào Cài đặt → Danh mục quy chế điểm → Thêm quy định mới; kiểm tra quy định xuất hiện trong danh sách và có thể chọn khi ghi điểm.
+- Vào Cài đặt → Thông tin lớp, nhập tổng số tuần và số tuần HKI rồi lưu; mở Rèn luyện cá nhân → Học kỳ & Cả năm để kiểm tra phạm vi tuần và kết quả tổng hợp.
 - Mở bản xem trước phiếu học sinh và kiểm tra tên học sinh, tên GVCN.
 
 ## Đưa lên GitHub Pages

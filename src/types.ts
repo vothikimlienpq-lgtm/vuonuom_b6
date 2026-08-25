@@ -13,6 +13,7 @@ export interface ClassConfig {
   slogan: string;
   week1StartDate: string; // YYYY-MM-DD
   totalWeeks: number;
+  semester1Weeks?: number; // Số tuần thuộc Học kỳ I; HKII nhận các tuần còn lại
   activeMonth: number;
   activeWeek: number;
   periodsPerDay?: number; // 5, 8, 10, etc.

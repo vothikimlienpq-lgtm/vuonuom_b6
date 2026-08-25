@@ -303,6 +303,7 @@ export const createInitialClassConfig = (
     slogan: 'Mỗi tuần một bước tiến – Cùng nhau vun đắp',
     week1StartDate: new Date().toISOString().slice(0, 10),
     totalWeeks: 38,
+    semester1Weeks: 18,
     activeMonth: new Date().getMonth() + 1,
     activeWeek: 1,
     periodsPerDay: 8,
@@ -963,20 +964,44 @@ export const api = {
 
   saveRule: async (rule: Partial<PointRule> & { id?: string }): Promise<{ success: boolean; message: string }> => {
     try {
-      const ruleId = rule.id || `R_CUSTOM_${Date.now()}`;
+      const content = String(rule.content || '').trim();
+      if (!content) {
+        throw new Error('Vui lòng nhập nội dung quy định.');
+      }
+
+      const points = Number(rule.defaultPoints);
+      if (!Number.isFinite(points) || points < 0) {
+        throw new Error('Số điểm phải là một số hợp lệ và không được nhỏ hơn 0.');
+      }
+
+      const validCategories: PointRule['category'][] = ['conduct', 'academic', 'attendance', 'task'];
+      const category = validCategories.includes(rule.category as PointRule['category'])
+        ? rule.category as PointRule['category']
+        : 'academic';
+      const ruleId = rule.id || `R_CUSTOM_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       const fullRule: PointRule = {
         id: ruleId,
-        type: rule.type || 'plus',
-        content: rule.content || '',
-        defaultPoints: Number(rule.defaultPoints) || 1,
-        category: rule.category || 'academic',
+        type: rule.type === 'minus' ? 'minus' : 'plus',
+        content,
+        defaultPoints: points,
+        category,
         isActive: rule.isActive !== undefined ? rule.isActive : true,
-        isFlexiblePoints: rule.isFlexiblePoints,
-        requiresSubjectAndExamType: rule.requiresSubjectAndExamType,
-        requiresReason: rule.requiresReason,
-        maxPerWeek: rule.maxPerWeek,
+        isFlexiblePoints: Boolean(rule.isFlexiblePoints),
+        requiresSubjectAndExamType: Boolean(rule.requiresSubjectAndExamType),
+        requiresReason: Boolean(rule.requiresReason),
       };
-      await setDoc(doc(rulesColRef, ruleId), fullRule);
+
+      const maxPerWeek = Number(rule.maxPerWeek);
+      if (Number.isInteger(maxPerWeek) && maxPerWeek > 0) {
+        fullRule.maxPerWeek = maxPerWeek;
+      }
+
+      // Firestore rejects properties whose value is undefined. Only send the
+      // validated fields so a newly-created rule can always be persisted.
+      await setDoc(
+        doc(rulesColRef, ruleId),
+        withoutUndefined(fullRule as unknown as Record<string, unknown>)
+      );
       return { success: true, message: 'Đã lưu quy định thi đua thành công!' };
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, 'pointRules');

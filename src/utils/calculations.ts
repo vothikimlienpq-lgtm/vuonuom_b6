@@ -1,4 +1,185 @@
-import { PointTransaction, GroupBonus, Student } from '../types';
+import { PointTransaction, GroupBonus, Student, ClassConfig } from '../types';
+import { getWeekDateRange } from './dateUtils';
+
+export type ConductRank = 'Tốt' | 'Khá' | 'Đạt' | 'Chưa đạt';
+
+export interface ConductMonthResult {
+  key: string;
+  label: string;
+  month: number;
+  year: number;
+  weekNumbers: number[];
+  totalPoints: number;
+  rank: ConductRank;
+}
+
+export interface ConductSemesterResult {
+  semester: 1 | 2;
+  startWeek: number;
+  endWeek: number;
+  months: ConductMonthResult[];
+  suggestedRank: ConductRank | null;
+  isComplete: boolean;
+}
+
+export interface StudentAnnualConductSummary {
+  studentId: string;
+  studentName: string;
+  groupNumber: number;
+  orderNumber: number;
+  semester1: ConductSemesterResult;
+  semester2: ConductSemesterResult;
+  annualRank: ConductRank | null;
+  isAnnualComplete: boolean;
+}
+
+const CONDUCT_RANK_ORDER: Record<ConductRank, number> = {
+  'Chưa đạt': 0,
+  'Đạt': 1,
+  'Khá': 2,
+  'Tốt': 3,
+};
+
+export function getConductRankFromPoints(totalPoints: number): ConductRank {
+  if (totalPoints >= 200) return 'Tốt';
+  if (totalPoints >= 100) return 'Khá';
+  if (totalPoints >= 51) return 'Đạt';
+  return 'Chưa đạt';
+}
+
+/**
+ * Gợi ý học kỳ theo dữ liệu theo dõi tháng của lớp. Đây là cách tổng hợp nội
+ * bộ theo mức thấp nhất của các tháng đã diễn ra; GVCN vẫn là người quyết định
+ * kết quả học kỳ theo Điều 8 Thông tư 22/2021/TT-BGDĐT.
+ */
+export function suggestSemesterConduct(months: ConductMonthResult[]): ConductRank | null {
+  if (months.length === 0) return null;
+  return months.reduce<ConductRank>((lowest, month) => (
+    CONDUCT_RANK_ORDER[month.rank] < CONDUCT_RANK_ORDER[lowest] ? month.rank : lowest
+  ), 'Tốt');
+}
+
+/**
+ * Xếp loại cả năm đúng ma trận tại Điều 8 Thông tư 22/2021/TT-BGDĐT.
+ * Kết quả HKII giữ vai trò chính, kết hợp với kết quả HKI.
+ */
+export function computeOfficialAnnualConduct(
+  semester1: ConductRank | null,
+  semester2: ConductRank | null
+): ConductRank | null {
+  if (!semester1 || !semester2) return null;
+
+  if (semester2 === 'Tốt' && (semester1 === 'Tốt' || semester1 === 'Khá')) {
+    return 'Tốt';
+  }
+
+  if (
+    (semester2 === 'Khá' && (semester1 === 'Tốt' || semester1 === 'Khá' || semester1 === 'Đạt'))
+    || (semester2 === 'Đạt' && semester1 === 'Tốt')
+    || (semester2 === 'Tốt' && (semester1 === 'Đạt' || semester1 === 'Chưa đạt'))
+  ) {
+    return 'Khá';
+  }
+
+  if (
+    (semester2 === 'Đạt' && (semester1 === 'Khá' || semester1 === 'Đạt' || semester1 === 'Chưa đạt'))
+    || (semester2 === 'Khá' && semester1 === 'Chưa đạt')
+  ) {
+    return 'Đạt';
+  }
+
+  return 'Chưa đạt';
+}
+
+const getElapsedAcademicWeeks = (config: ClassConfig): number => {
+  const startValue = config.week1StartDate || '';
+  const [year, month, day] = startValue.split('-').map(Number);
+  const start = new Date(year, (month || 1) - 1, day || 1);
+  if (Number.isNaN(start.getTime())) return 0;
+  const elapsed = Math.floor((Date.now() - start.getTime()) / 604800000) + 1;
+  return Math.min(Math.max(elapsed, 0), Math.max(1, Number(config.totalWeeks) || 38));
+};
+
+const buildSemesterResult = (
+  studentId: string,
+  transactions: PointTransaction[],
+  config: ClassConfig,
+  semester: 1 | 2,
+  startWeek: number,
+  endWeek: number,
+  elapsedWeeks: number
+): ConductSemesterResult => {
+  const evaluatedEndWeek = Math.min(endWeek, elapsedWeeks);
+  const groupedWeeks = new Map<string, { label: string; month: number; year: number; weekNumbers: number[] }>();
+
+  for (let week = startWeek; week <= evaluatedEndWeek; week += 1) {
+    const info = getWeekDateRange(config.week1StartDate, week);
+    const key = `${info.yearNum}-${String(info.monthNum).padStart(2, '0')}`;
+    const existing = groupedWeeks.get(key);
+    if (existing) existing.weekNumbers.push(week);
+    else groupedWeeks.set(key, {
+      label: `Tháng ${info.monthNum}/${info.yearNum}`,
+      month: info.monthNum,
+      year: info.yearNum,
+      weekNumbers: [week],
+    });
+  }
+
+  const studentTransactions = transactions.filter((tx) => tx.studentId === studentId);
+  const months: ConductMonthResult[] = Array.from(groupedWeeks.entries()).map(([key, period]) => {
+    const allowedWeeks = new Set(period.weekNumbers);
+    const totalPoints = studentTransactions
+      .filter((tx) => allowedWeeks.has(Number(tx.week)))
+      .reduce((sum, tx) => sum + getSignedTransactionPoints(tx), 0);
+    return {
+      key,
+      ...period,
+      totalPoints,
+      rank: getConductRankFromPoints(totalPoints),
+    };
+  });
+
+  return {
+    semester,
+    startWeek,
+    endWeek,
+    months,
+    suggestedRank: suggestSemesterConduct(months),
+    isComplete: elapsedWeeks >= endWeek,
+  };
+};
+
+export function computeAcademicYearConduct(
+  students: Student[] = [],
+  transactions: PointTransaction[] = [],
+  config: ClassConfig
+): StudentAnnualConductSummary[] {
+  const totalWeeks = Math.max(2, Number(config.totalWeeks) || 38);
+  const semester1Weeks = Math.min(
+    Math.max(1, Number(config.semester1Weeks) || 18),
+    totalWeeks - 1
+  );
+  const elapsedWeeks = getElapsedAcademicWeeks(config);
+
+  return students.map((student) => {
+    const semester1 = buildSemesterResult(
+      student.id, transactions, config, 1, 1, semester1Weeks, elapsedWeeks
+    );
+    const semester2 = buildSemesterResult(
+      student.id, transactions, config, 2, semester1Weeks + 1, totalWeeks, elapsedWeeks
+    );
+    return {
+      studentId: student.id,
+      studentName: student.fullName,
+      groupNumber: student.groupNumber,
+      orderNumber: student.orderNumber,
+      semester1,
+      semester2,
+      annualRank: computeOfficialAnnualConduct(semester1.suggestedRank, semester2.suggestedRank),
+      isAnnualComplete: semester1.isComplete && semester2.isComplete,
+    };
+  });
+}
 
 export interface StudentScoreSummary {
   studentId: string;
@@ -9,7 +190,7 @@ export interface StudentScoreSummary {
   weekScores: { [week: number]: number };
   monthTotal: number;
   monthAverage: number;
-  conductRank: 'Tốt' | 'Khá' | 'Đạt' | 'Chưa đạt';
+  conductRank: ConductRank;
   isTemporary: boolean;
   disciplineFaults: number;
   academicFaults: number;
@@ -117,11 +298,7 @@ export function computeStudentScores(
     // Base average across 4 tracking weeks
     const monthAverage = Math.round(monthTotal / 4);
 
-    let conductRank: 'Tốt' | 'Khá' | 'Đạt' | 'Chưa đạt' = 'Chưa đạt';
-    if (monthTotal >= 200) conductRank = 'Tốt';
-    else if (monthTotal >= 100) conductRank = 'Khá';
-    else if (monthTotal >= 51) conductRank = 'Đạt';
-    else conductRank = 'Chưa đạt';
+    const conductRank = getConductRankFromPoints(monthTotal);
 
     const isTemporary = completedWeeksCount < 4;
 

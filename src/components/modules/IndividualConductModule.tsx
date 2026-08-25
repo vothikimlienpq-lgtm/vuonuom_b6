@@ -24,6 +24,7 @@ import { ModuleTab } from '../Navigation';
 import { computeStudentScores, formatSignedPoints, getSignedTransactionPoints, StudentScoreSummary } from '../../utils/calculations';
 import { ParentReportPrintModal } from '../ParentReportPrintModal';
 import { useToast } from '../Toast';
+import { ConductYearSummary } from './ConductYearSummary';
 
 interface IndividualConductModuleProps {
   data: FullClassData;
@@ -48,6 +49,7 @@ export const IndividualConductModule: React.FC<IndividualConductModuleProps> = (
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'order' | 'name' | 'total'>('order');
   const [sortAsc, setSortAsc] = useState(true);
+  const [viewMode, setViewMode] = useState<'month' | 'academicYear'>('month');
 
   // Student Detail Modal & Print Modal
   const [activeDetailStudent, setActiveDetailStudent] = useState<StudentScoreSummary | null>(null);
@@ -59,6 +61,42 @@ export const IndividualConductModule: React.FC<IndividualConductModuleProps> = (
   const homeworkTasks = data.homeworkTasks || [];
 
   const studentSummaries = computeStudentScores(students, transactions, selectedMonth);
+
+  const viewSwitcher = (
+    <div className="bg-white rounded-2xl p-1.5 border border-emerald-100 shadow-sm inline-flex items-center gap-1">
+      <button
+        type="button"
+        onClick={() => setViewMode('month')}
+        className={`px-4 py-2 rounded-xl text-xs font-black transition ${
+          viewMode === 'month'
+            ? 'bg-[#064e3b] text-amber-300 shadow'
+            : 'text-slate-600 hover:bg-slate-100'
+        }`}
+      >
+        Theo tháng
+      </button>
+      <button
+        type="button"
+        onClick={() => setViewMode('academicYear')}
+        className={`px-4 py-2 rounded-xl text-xs font-black transition ${
+          viewMode === 'academicYear'
+            ? 'bg-[#064e3b] text-amber-300 shadow'
+            : 'text-slate-600 hover:bg-slate-100'
+        }`}
+      >
+        Học kỳ & Cả năm
+      </button>
+    </div>
+  );
+
+  if (viewMode === 'academicYear') {
+    return (
+      <div className="space-y-5">
+        <div className="flex justify-center sm:justify-start">{viewSwitcher}</div>
+        <ConductYearSummary data={data} userRole={userRole} session={session} />
+      </div>
+    );
+  }
 
   // -------------------------------------------------------------
   // PARENT EXCLUSIVE VIEW: Strictly shows ONLY the parent's child
@@ -97,6 +135,7 @@ export const IndividualConductModule: React.FC<IndividualConductModuleProps> = (
 
     return (
       <div className="space-y-6">
+        <div className="flex justify-center sm:justify-start">{viewSwitcher}</div>
         
         {/* Parent Banner */}
         <div className="bg-gradient-to-br from-[#064e3b] via-[#095c47] to-[#043d2e] rounded-[28px] p-6 sm:p-8 text-white shadow-xl flex flex-col md:flex-row md:items-center md:justify-between gap-5 relative overflow-hidden">
@@ -395,6 +434,7 @@ export const IndividualConductModule: React.FC<IndividualConductModuleProps> = (
 
   return (
     <div className="space-y-6">
+      <div className="flex justify-center sm:justify-start">{viewSwitcher}</div>
       
       {/* Header Banner */}
       <div className="bg-gradient-to-r from-[#064e3b] via-[#095c47] to-[#043d2e] rounded-[28px] p-6 sm:p-8 text-white shadow-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

@@ -89,7 +89,7 @@ export const HomeworkScheduleModule: React.FC<HomeworkScheduleModuleProps> = ({
     existing?: TimetableEntry;
   } | null>(null);
 
-  const [formSubject, setFormSubject] = useState('Chào cờ');
+  const [formSubject, setFormSubject] = useState('');
   const [formLessonName, setFormLessonName] = useState('');
   const [formHomework, setFormHomework] = useState('');
   const [formMaterials, setFormMaterials] = useState('');
@@ -124,14 +124,14 @@ export const HomeworkScheduleModule: React.FC<HomeworkScheduleModuleProps> = ({
     const existing = currentWeekTimetable.find(t => t.dayOfWeek === day && t.period === period);
     setEditingEntry({ dayOfWeek: day, period, existing });
     if (existing) {
-      setFormSubject(existing.subject || 'Chào cờ');
+      setFormSubject(existing.subject || '');
       setFormLessonName(existing.lessonName || '');
       setFormHomework(existing.homework || '');
       setFormMaterials(existing.materials || '');
       setFormTag(existing.tag || 'Bình thường');
       setFormNote(existing.note || '');
     } else {
-      setFormSubject(config.subjects[0] || 'Toán');
+      setFormSubject('');
       setFormLessonName('');
       setFormHomework('');
       setFormMaterials('');
@@ -144,6 +144,11 @@ export const HomeworkScheduleModule: React.FC<HomeworkScheduleModuleProps> = ({
   const handleSaveEntry = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingEntry) return;
+    const subject = formSubject.trim();
+    if (!subject) {
+      warning('Vui lòng nhập tên môn học.');
+      return;
+    }
     setSavingEntry(true);
     try {
       const res = await api.saveTimetableEntry({
@@ -153,7 +158,7 @@ export const HomeworkScheduleModule: React.FC<HomeworkScheduleModuleProps> = ({
         dayOfWeek: editingEntry.dayOfWeek,
         period: editingEntry.period,
         session: editingEntry.period <= morningCount ? 'morning' : 'afternoon',
-        subject: formSubject,
+        subject,
         lessonName: formLessonName,
         homework: formHomework,
         materials: formMaterials,
@@ -703,19 +708,18 @@ export const HomeworkScheduleModule: React.FC<HomeworkScheduleModuleProps> = ({
 
             <form onSubmit={handleSaveEntry} className="space-y-3.5">
               
-              {/* Subject */}
+              {/* Subject: free text so every school can use its own subjects */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Môn học:</label>
-                <select
+                <input
+                  type="text"
                   value={formSubject}
                   onChange={(e) => setFormSubject(e.target.value)}
+                  placeholder="Tự nhập tên môn học..."
+                  autoFocus
+                  required
                   className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 bg-white"
-                >
-                  {config.subjects.map(s => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                  <option value="Khác">Khác / Tự chọn</option>
-                </select>
+                />
               </div>
 
               {/* Tag / Badge */}
