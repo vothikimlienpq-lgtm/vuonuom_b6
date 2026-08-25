@@ -19,8 +19,10 @@ import {
   signOut,
   onAuthStateChanged,
   updatePassword,
+  getAuth,
   User,
 } from 'firebase/auth';
+import { deleteApp, initializeApp } from 'firebase/app';
 import {
   db,
   auth,
@@ -28,6 +30,7 @@ import {
   isFirebaseConfigured,
   handleFirestoreError,
   OperationType,
+  rawFirebaseConfig,
 } from '../firebase/config';
 import {
   FullClassData,
@@ -298,6 +301,7 @@ export const createInitialClassConfig = (
     initialized: false,
     className,
     schoolName: 'Chưa cập nhật',
+    educationDepartment: '',
     academicYear: academicYearFromId(normalizedClassId),
     teacherName: 'Chưa cập nhật',
     themeTitle: `Vườn Ươm ${className}`,
@@ -1940,6 +1944,80 @@ export const api = {
         throw new Error('Phiên đăng nhập đã quá lâu. Vui lòng đăng xuất và đăng nhập lại trước khi đổi mật khẩu.');
       }
       throw new Error(err.message || 'Lỗi khi đổi mật khẩu.');
+    }
+  },
+
+  listManagedClassAccounts: async (): Promise<Array<{
+    uid: string;
+    email: string;
+    displayName: string;
+    role: 'bcs' | 'student';
+  }>> => {
+    try {
+      const memberSnaps = await getDocs(membersColRef);
+      return memberSnaps.docs
+        .map((memberSnap) => {
+          const value = memberSnap.data();
+          return {
+            uid: memberSnap.id,
+            email: String(value.email || '').trim().toLowerCase(),
+            displayName: String(value.displayName || value.studentName || value.email || 'Tài khoản lớp'),
+            role: value.role === 'bcs' ? 'bcs' as const : 'student' as const,
+            active: value.active === true,
+            sourceRole: String(value.role || ''),
+          };
+        })
+        .filter((account) => account.active && account.email && (account.sourceRole === 'bcs' || account.sourceRole === 'student'))
+        .map(({ uid, email, displayName, role }) => ({ uid, email, displayName, role }))
+        .sort((a, b) => a.role.localeCompare(b.role) || a.displayName.localeCompare(b.displayName, 'vi'));
+    } catch (err) {
+      handleFirestoreError(err, OperationType.LIST, 'members');
+    }
+  },
+
+  updateManagedClassAccountPassword: async (payload: {
+    email: string;
+    currentPassword: string;
+    newPassword: string;
+  }): Promise<{ success: boolean; message: string }> => {
+    const email = payload.email.trim().toLowerCase();
+    const currentPassword = payload.currentPassword;
+    const newPassword = payload.newPassword.trim();
+    if (!email || !currentPassword || newPassword.length < 6) {
+      throw new Error('Vui lòng chọn tài khoản, nhập mật khẩu hiện tại và mật khẩu mới từ 6 ký tự.');
+    }
+
+    const memberSnaps = await getDocs(membersColRef);
+    const targetMember = memberSnaps.docs.find((memberSnap) => {
+      const value = memberSnap.data();
+      return value.active === true
+        && (value.role === 'bcs' || value.role === 'student')
+        && String(value.email || '').trim().toLowerCase() === email;
+    });
+    if (!targetMember) {
+      throw new Error('Tài khoản không thuộc Ban cán sự hoặc Thành viên đang hoạt động của lớp này.');
+    }
+
+    const secondaryApp = initializeApp(rawFirebaseConfig, `password-update-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    const secondaryAuth = getAuth(secondaryApp);
+    try {
+      const credential = await signInWithEmailAndPassword(secondaryAuth, email, currentPassword);
+      await updatePassword(credential.user, newPassword);
+      await signOut(secondaryAuth).catch(() => undefined);
+      return {
+        success: true,
+        message: `Đã đổi mật khẩu tài khoản ${email} trên Firebase Authentication thành công!`,
+      };
+    } catch (err: any) {
+      if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        throw new Error('Mật khẩu hiện tại của tài khoản đã chọn không chính xác.');
+      }
+      if (err.code === 'auth/too-many-requests') {
+        throw new Error('Tài khoản tạm khóa do thử quá nhiều lần. Vui lòng thử lại sau.');
+      }
+      throw new Error(err.message || 'Không thể đổi mật khẩu tài khoản lớp.');
+    } finally {
+      await deleteApp(secondaryApp).catch(() => undefined);
     }
   },
 

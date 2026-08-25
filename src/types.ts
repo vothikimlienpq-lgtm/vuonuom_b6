@@ -7,6 +7,7 @@ export interface ClassConfig {
   initialized?: boolean;
   className: string;
   schoolName: string;
+  educationDepartment?: string;
   academicYear: string;
   teacherName: string;
   themeTitle: string;

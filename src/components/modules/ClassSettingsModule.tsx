@@ -55,6 +55,7 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
   // Form states
   const [config, setConfig] = useState<ClassConfig>({
     ...currentConfig,
+    educationDepartment: currentConfig.educationDepartment || '',
     academicYear: currentConfig.academicYear || '2026 – 2027',
     week1StartDate: currentConfig.week1StartDate || '2026-08-03',
     totalWeeks: currentConfig.totalWeeks || 38,
@@ -70,6 +71,7 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
   useEffect(() => {
     setConfig({
       ...data.config,
+      educationDepartment: data.config.educationDepartment || '',
       totalWeeks: data.config.totalWeeks || 38,
       semester1Weeks: data.config.semester1Weeks || 18,
     });
@@ -77,9 +79,39 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
 
   // Security Form states
   const [gvcnPass, setGvcnPass] = useState('');
-  const [bcsPass, setBcsPass] = useState('');
-  const [studentPass, setStudentPass] = useState('');
   const [updatingPass, setUpdatingPass] = useState(false);
+  const [managedAccounts, setManagedAccounts] = useState<Array<{
+    uid: string;
+    email: string;
+    displayName: string;
+    role: 'bcs' | 'student';
+  }>>([]);
+  const [selectedManagedEmail, setSelectedManagedEmail] = useState('');
+  const [managedCurrentPass, setManagedCurrentPass] = useState('');
+  const [managedNewPass, setManagedNewPass] = useState('');
+  const [loadingManagedAccounts, setLoadingManagedAccounts] = useState(false);
+  const [updatingManagedPass, setUpdatingManagedPass] = useState(false);
+
+  useEffect(() => {
+    if (!isGvcn || activeTab !== 'security') return;
+    let cancelled = false;
+    setLoadingManagedAccounts(true);
+    api.listManagedClassAccounts()
+      .then((accounts) => {
+        if (cancelled) return;
+        setManagedAccounts(accounts);
+        setSelectedManagedEmail((current) => current && accounts.some((account) => account.email === current)
+          ? current
+          : accounts[0]?.email || '');
+      })
+      .catch((err: any) => {
+        if (!cancelled) error(err.message || 'Không thể tải danh sách tài khoản lớp.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingManagedAccounts(false);
+      });
+    return () => { cancelled = true; };
+  }, [activeTab, isGvcn]);
 
   // Add Rule Modal
   const [showAddRuleModal, setShowAddRuleModal] = useState(false);
@@ -181,6 +213,35 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
       error(err.message || 'Lỗi khi cập nhật mật khẩu.');
     } finally {
       setUpdatingPass(false);
+    }
+  };
+
+  const handleUpdateManagedPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedManagedEmail) {
+      warning('Vui lòng chọn tài khoản Ban cán sự hoặc Thành viên lớp.');
+      return;
+    }
+    if (!managedCurrentPass || managedNewPass.trim().length < 6) {
+      warning('Vui lòng nhập mật khẩu hiện tại và mật khẩu mới từ 6 ký tự.');
+      return;
+    }
+    setUpdatingManagedPass(true);
+    try {
+      const res = await api.updateManagedClassAccountPassword({
+        email: selectedManagedEmail,
+        currentPassword: managedCurrentPass,
+        newPassword: managedNewPass,
+      });
+      if (res.success) {
+        success(res.message);
+        setManagedCurrentPass('');
+        setManagedNewPass('');
+      }
+    } catch (err: any) {
+      error(err.message || 'Lỗi khi cập nhật mật khẩu tài khoản lớp.');
+    } finally {
+      setUpdatingManagedPass(false);
     }
   };
 
@@ -479,7 +540,7 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
 
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
                       Tên Trường <span className="text-rose-500">*</span>
@@ -507,6 +568,22 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
                       className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 outline-none"
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Sở Giáo dục và Đào tạo chủ quản
+                  </label>
+                  <input
+                    type="text"
+                    value={config.educationDepartment || ''}
+                    onChange={(e) => setConfig({ ...config, educationDepartment: e.target.value })}
+                    placeholder="Ví dụ: Sở Giáo dục và Đào tạo Quảng Trị"
+                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 outline-none"
+                  />
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Nội dung này tự động đồng bộ vào phần đầu phiếu in; nếu chưa nhập, phiếu sẽ nhắc “Chưa cập nhật”.
+                  </p>
                 </div>
               </div>
 
@@ -734,6 +811,9 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
                   </div>
                   <div className="text-xs text-emerald-100 opacity-90">
                     {config.schoolName || 'THPT Kim Liên'} • GVCN: {config.teacherName || 'Cô Kim Liên'}
+                  </div>
+                  <div className="text-[10px] text-emerald-200/80 mt-0.5">
+                    {config.educationDepartment || 'Sở GDĐT: Chưa cập nhật'}
                   </div>
                 </div>
               </div>
@@ -999,17 +1079,17 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
 
       {/* Tab 4: Security & Authentication */}
       {activeTab === 'security' && (
-        <div className="bg-white rounded-[24px] p-6 shadow-sm border border-emerald-100 space-y-6 max-w-2xl">
+        <div className="bg-white rounded-[24px] p-6 shadow-sm border border-emerald-100 space-y-6 max-w-4xl">
           <div>
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-900 uppercase">
               Firebase Authentication
             </span>
             <h3 className="text-lg font-black text-emerald-950 mt-1 flex items-center gap-2">
               <KeyRound className="w-5 h-5 text-amber-500" />
-              <span>Bảo Mật Tài Khoản Giáo Viên Chủ Nhiệm</span>
+              <span>Bảo Mật Tài Khoản Lớp</span>
             </h3>
             <p className="text-xs text-slate-500 mt-1">
-              Ứng dụng sử dụng Firebase Authentication để xác thực tài khoản GVCN an toàn. Mật khẩu không bao giờ lưu trữ dạng văn bản thô.
+              Ứng dụng sử dụng Firebase Authentication để xác thực GVCN, Ban cán sự và thành viên. Mật khẩu không bao giờ lưu trữ dạng văn bản thô.
             </p>
           </div>
 
@@ -1028,29 +1108,98 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
           </div>
 
           {isGvcn ? (
-            <form onSubmit={handleUpdatePasswords} className="space-y-4 max-w-md">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Đổi mật khẩu mới cho tài khoản GVCN ({teacherEmail}):
-                </label>
-                <input
-                  type="password"
-                  value={gvcnPass}
-                  onChange={(e) => setGvcnPass(e.target.value)}
-                  placeholder="Nhập mật khẩu mới (ít nhất 6 ký tự)..."
-                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs bg-slate-50 focus:bg-white focus:border-emerald-600 outline-none"
-                />
-              </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              <form onSubmit={handleUpdatePasswords} className="space-y-4 rounded-2xl border border-emerald-100 bg-emerald-50/40 p-5">
+                <div>
+                  <h4 className="text-sm font-black text-emerald-950">Tài khoản GVCN</h4>
+                  <p className="mt-1 text-[11px] text-slate-500">Đổi mật khẩu của tài khoản đang đăng nhập.</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Mật khẩu mới cho {teacherEmail}
+                  </label>
+                  <input
+                    type="password"
+                    value={gvcnPass}
+                    onChange={(e) => setGvcnPass(e.target.value)}
+                    placeholder="Nhập mật khẩu mới (ít nhất 6 ký tự)..."
+                    autoComplete="new-password"
+                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs bg-white focus:border-emerald-600 outline-none"
+                  />
+                </div>
 
-              <button
-                type="submit"
-                disabled={updatingPass || !gvcnPass.trim()}
-                className="px-6 py-2.5 rounded-xl bg-[#064e3b] text-amber-300 font-bold text-xs shadow-md hover:bg-[#095c47] disabled:opacity-50 cursor-pointer flex items-center gap-2"
-              >
-                <Lock className="w-4 h-4" />
-                <span>{updatingPass ? 'Đang cập nhật...' : 'Cập nhật mật khẩu GVCN'}</span>
-              </button>
-            </form>
+                <button
+                  type="submit"
+                  disabled={updatingPass || gvcnPass.trim().length < 6}
+                  className="px-6 py-2.5 rounded-xl bg-[#064e3b] text-amber-300 font-bold text-xs shadow-md hover:bg-[#095c47] disabled:opacity-50 cursor-pointer flex items-center gap-2"
+                >
+                  <Lock className="w-4 h-4" />
+                  <span>{updatingPass ? 'Đang cập nhật...' : 'Cập nhật mật khẩu GVCN'}</span>
+                </button>
+              </form>
+
+              <form onSubmit={handleUpdateManagedPassword} className="space-y-4 rounded-2xl border border-amber-200 bg-amber-50/50 p-5">
+                <div>
+                  <h4 className="text-sm font-black text-emerald-950">Ban cán sự & Thành viên lớp</h4>
+                  <p className="mt-1 text-[11px] leading-relaxed text-slate-600">
+                    Chọn đúng tài khoản rồi nhập mật khẩu hiện tại để xác thực trước khi đặt mật khẩu mới.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Tài khoản cần đổi</label>
+                  <select
+                    value={selectedManagedEmail}
+                    onChange={(e) => setSelectedManagedEmail(e.target.value)}
+                    disabled={loadingManagedAccounts || managedAccounts.length === 0}
+                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold bg-white disabled:opacity-60"
+                  >
+                    {managedAccounts.length === 0 && (
+                      <option value="">{loadingManagedAccounts ? 'Đang tải tài khoản...' : 'Chưa có tài khoản BCS/Thành viên'}</option>
+                    )}
+                    {managedAccounts.map((account) => (
+                      <option key={account.uid} value={account.email}>
+                        {account.role === 'bcs' ? 'Ban cán sự' : 'Thành viên'} — {account.displayName} ({account.email})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Mật khẩu hiện tại</label>
+                    <input
+                      type="password"
+                      value={managedCurrentPass}
+                      onChange={(e) => setManagedCurrentPass(e.target.value)}
+                      placeholder="Mật khẩu hiện tại..."
+                      autoComplete="current-password"
+                      className="w-full p-2.5 rounded-xl border border-slate-300 text-xs bg-white focus:border-emerald-600 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Mật khẩu mới</label>
+                    <input
+                      type="password"
+                      value={managedNewPass}
+                      onChange={(e) => setManagedNewPass(e.target.value)}
+                      placeholder="Ít nhất 6 ký tự..."
+                      autoComplete="new-password"
+                      className="w-full p-2.5 rounded-xl border border-slate-300 text-xs bg-white focus:border-emerald-600 outline-none"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={updatingManagedPass || !selectedManagedEmail || !managedCurrentPass || managedNewPass.trim().length < 6}
+                  className="px-6 py-2.5 rounded-xl bg-amber-400 text-emerald-950 font-black text-xs shadow-md hover:bg-amber-300 disabled:opacity-50 cursor-pointer flex items-center gap-2"
+                >
+                  <KeyRound className="w-4 h-4" />
+                  <span>{updatingManagedPass ? 'Đang cập nhật...' : 'Cập nhật mật khẩu tài khoản đã chọn'}</span>
+                </button>
+              </form>
+            </div>
           ) : (
             <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-center justify-between">
               <span>Vui lòng đăng nhập tài khoản GVCN để thực hiện đổi mật khẩu.</span>

@@ -234,6 +234,7 @@ function MainAppContent() {
                 data={data}
                 selectedMonth={selectedMonth}
                 selectedWeek={selectedWeek}
+                onSelectMonth={handleSelectMonth}
                 onNavigate={setActiveTab}
               />
             )}
@@ -256,6 +257,7 @@ function MainAppContent() {
                 data={data}
                 selectedMonth={selectedMonth}
                 selectedWeek={selectedWeek}
+                onSelectMonth={handleSelectMonth}
                 onRefresh={() => fetchData(true)}
                 userRole={session?.role || 'guest'}
               />

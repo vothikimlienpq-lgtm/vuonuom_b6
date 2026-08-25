@@ -337,10 +337,20 @@ export interface GroupStanding {
   groupName: string;
   memberCount: number;
   weekScores: { [week: number]: number };
+  weekAverages: { [week: number]: number };
   memberPointsTotal: number;
+  memberPointsAverage: number;
   bonusPointsTotal: number;
+  /** Điểm dùng để xếp hạng = trung bình điểm thành viên + thưởng tập thể. */
   grandTotal: number;
   rank: number; // 1, 2, 3, 4
+}
+
+const roundToOneDecimal = (value: number): number => Math.round(value * 10) / 10;
+
+export function formatAveragePoints(value: number): string {
+  const rounded = roundToOneDecimal(Number.isFinite(value) ? value : 0);
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1).replace('.', ',');
 }
 
 export function computeGroupStandings(
@@ -367,22 +377,38 @@ export function computeGroupStandings(
     });
 
     const bonusPointsTotal = bonuses.reduce((sum, b) => sum + (b.bonusPoints || 0), 0);
-    const grandTotal = memberPointsTotal + bonusPointsTotal;
+    const memberCount = groupStudents.length;
+    const weekAverages: { [week: number]: number } = { 1: 0, 2: 0, 3: 0, 4: 0 };
+    for (let w = 1; w <= 4; w++) {
+      weekAverages[w] = memberCount > 0 ? roundToOneDecimal(weekScores[w] / memberCount) : 0;
+    }
+    const memberPointsAverage = memberCount > 0
+      ? roundToOneDecimal(memberPointsTotal / memberCount)
+      : 0;
+    const grandTotal = roundToOneDecimal(memberPointsAverage + bonusPointsTotal);
 
     return {
       groupNumber: gNum,
       groupName: `Tổ ${gNum}`,
-      memberCount: groupStudents.length,
+      memberCount,
       weekScores,
+      weekAverages,
       memberPointsTotal,
+      memberPointsAverage,
       bonusPointsTotal,
       grandTotal,
       rank: 0,
     };
   });
 
-  // Sort descending by grand total
-  const sorted = [...standings].sort((a, b) => b.grandTotal - a.grandTotal);
+  // Tổ không có thành viên luôn đứng sau; các tổ còn lại xếp theo điểm trung bình công bằng.
+  const sorted = [...standings].sort((a, b) => {
+    if (a.memberCount === 0 && b.memberCount > 0) return 1;
+    if (b.memberCount === 0 && a.memberCount > 0) return -1;
+    if (b.grandTotal !== a.grandTotal) return b.grandTotal - a.grandTotal;
+    if (b.memberPointsAverage !== a.memberPointsAverage) return b.memberPointsAverage - a.memberPointsAverage;
+    return a.groupNumber - b.groupNumber;
+  });
   sorted.forEach((g, idx) => {
     const orig = standings.find(s => s.groupNumber === g.groupNumber);
     if (orig) {

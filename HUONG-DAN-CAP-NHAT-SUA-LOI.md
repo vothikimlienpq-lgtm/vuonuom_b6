@@ -22,6 +22,10 @@
     - Quy định đã lưu trùng mã sẽ cập nhật đúng bản ghi tương ứng, không tạo bản sao.
     - Xóa quy định chuẩn không làm quy định đó tự xuất hiện lại sau khi tải trang.
     - Quy định tự thêm được nối sau danh sách chuẩn và vẫn xóa bình thường.
+12. Bảng xếp hạng thi đua 4 tổ được tính công bằng theo công thức **trung bình điểm mỗi học sinh + điểm thưởng tập thể**; tổ không có thành viên luôn xếp sau.
+13. Bảng xếp hạng ở Tổng quan và Thi đua theo tổ có bộ chọn tháng để xem lại các tháng đã qua.
+14. Cài đặt lớp có thêm ô **Sở Giáo dục và Đào tạo chủ quản**; phần đầu và địa danh ký trên phiếu in tự động lấy từ nội dung này, không còn ghi cứng Hà Nội.
+15. Mục **Đổi mật khẩu** hỗ trợ cả GVCN, Ban cán sự và Thành viên lớp. Với tài khoản BCS/Thành viên, hệ thống yêu cầu mật khẩu hiện tại trước khi đổi và chỉ thao tác trên tài khoản đang hoạt động của đúng lớp.
 
 ## Cách kiểm tra trên máy
 
@@ -42,6 +46,10 @@ Sau đó mở địa chỉ Vite hiển thị trong Terminal và kiểm tra lần
 - Ghi một tiết trong mục Báo bài & Thời khóa biểu, sau đó thử sửa và xóa.
 - Vào Cài đặt → Danh mục quy chế điểm → Thêm quy định mới; kiểm tra quy định xuất hiện trong danh sách và có thể chọn khi ghi điểm.
 - Sau khi thêm quy định mới, xác nhận toàn bộ quy định chuẩn vẫn còn; tải lại trang và kiểm tra danh sách không bị thay thế.
+- So sánh hai tổ có sĩ số khác nhau và xác nhận thứ hạng dựa trên cột **TB cá nhân/HS**, không dựa vào tổng điểm thô.
+- Chọn một tháng cũ ngay trong bảng xếp hạng tổ và xác nhận số liệu đổi đúng tháng.
+- Vào Cài đặt lớp, nhập Sở GDĐT rồi mở phiếu in để kiểm tra phần đầu phiếu và địa danh ngày ký.
+- Vào Đổi mật khẩu, chọn thử một tài khoản BCS/Thành viên; xác nhận mật khẩu hiện tại sai bị từ chối và mật khẩu đúng cho phép cập nhật.
 - Vào Cài đặt → Thông tin lớp, nhập tổng số tuần và số tuần HKI rồi lưu; mở Rèn luyện cá nhân → Học kỳ & Cả năm để kiểm tra phạm vi tuần và kết quả tổng hợp.
 - Mở bản xem trước phiếu học sinh và kiểm tra tên học sinh, tên GVCN.
 

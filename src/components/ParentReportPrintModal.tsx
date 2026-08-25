@@ -12,6 +12,16 @@ interface ParentReportPrintModalProps {
   selectedWeek: number;
 }
 
+const getDepartmentLocation = (department: string): string => {
+  const cleaned = department.trim();
+  if (!cleaned) return '........';
+  const fullNameMatch = cleaned.match(/đào\s*tạo\s+(.+)$/iu);
+  const shortNameMatch = cleaned.match(/gd\s*(?:&|và)?\s*đt\s+(.+)$/iu);
+  return (fullNameMatch?.[1] || shortNameMatch?.[1] || cleaned)
+    .replace(/^tp\.?\s*/iu, '')
+    .trim() || '........';
+};
+
 export const ParentReportPrintModal: React.FC<ParentReportPrintModalProps> = ({
   isOpen,
   onClose,
@@ -34,6 +44,11 @@ export const ParentReportPrintModal: React.FC<ParentReportPrintModalProps> = ({
       : 'Chưa cập nhật tên GVCN';
   const academicYears = String(config.academicYear || '').match(/20\d{2}/g);
   const reportYear = academicYears?.[academicYears.length - 1] || new Date().getFullYear();
+  const educationDepartment = String(config.educationDepartment || '').trim();
+  const educationDepartmentForPrint = educationDepartment
+    ? educationDepartment.toLocaleUpperCase('vi-VN')
+    : 'SỞ GIÁO DỤC VÀ ĐÀO TẠO: CHƯA CẬP NHẬT';
+  const reportLocation = getDepartmentLocation(educationDepartment);
 
   const studentSummaries = computeStudentScores(allStudents, allTransactions, selectedMonth);
 
@@ -84,7 +99,7 @@ export const ParentReportPrintModal: React.FC<ParentReportPrintModalProps> = ({
               <div className="flex items-start justify-between border-b-2 border-emerald-900 pb-4 mb-6">
                 <div>
                   <div className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
-                    SỞ GIÁO DỤC VÀ ĐÀO TẠO TP. HÀ NỘI
+                    {educationDepartmentForPrint}
                   </div>
                   <div className="text-sm font-black uppercase text-[#064e3b]">
                     {config.schoolName || 'CHƯA CẬP NHẬT TRƯỜNG'}
@@ -254,7 +269,7 @@ export const ParentReportPrintModal: React.FC<ParentReportPrintModalProps> = ({
 
                 <div>
                   <div className="text-[11px] text-slate-500 italic mb-1">
-                    Hà Nội, ngày ..... tháng ..... năm {reportYear}
+                    {reportLocation}, ngày ..... tháng ..... năm {reportYear}
                   </div>
                   <div className="font-bold text-slate-800 uppercase">GIÁO VIÊN CHỦ NHIỆM</div>
                   <div className="text-[10px] text-slate-400 italic mt-0.5">(Ký và ghi rõ họ tên)</div>

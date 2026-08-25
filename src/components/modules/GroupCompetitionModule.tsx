@@ -9,10 +9,11 @@ import {
   ChevronDown, 
   ChevronUp, 
   Lock,
-  Gift
+  Gift,
+  Calendar
 } from 'lucide-react';
 import { FullClassData, UserRole } from '../../types';
-import { computeGroupStandings, computeStudentScores, formatSignedPoints } from '../../utils/calculations';
+import { computeGroupStandings, computeStudentScores, formatAveragePoints, formatSignedPoints } from '../../utils/calculations';
 import { api } from '../../services/api';
 import { useToast } from '../Toast';
 
@@ -20,6 +21,7 @@ interface GroupCompetitionModuleProps {
   data: FullClassData;
   selectedMonth: number;
   selectedWeek: number;
+  onSelectMonth: (month: number) => void;
   onRefresh: () => void;
   userRole?: UserRole;
 }
@@ -28,6 +30,7 @@ export const GroupCompetitionModule: React.FC<GroupCompetitionModuleProps> = ({
   data,
   selectedMonth,
   selectedWeek,
+  onSelectMonth,
   onRefresh,
   userRole = 'guest',
 }) => {
@@ -96,19 +99,35 @@ export const GroupCompetitionModule: React.FC<GroupCompetitionModuleProps> = ({
             <span>Bảng Vinh Danh Thi Đua 4 Tổ</span>
           </h2>
           <p className="text-emerald-100 text-xs sm:text-sm mt-1">
-            Điểm tổ = Tổng điểm 4 tuần của toàn bộ thành viên + Điểm thưởng tập thể do GVCN trao tặng.
+            Điểm xếp hạng = Trung bình điểm mỗi học sinh trong tổ + Điểm thưởng tập thể do GVCN trao tặng.
           </p>
         </div>
 
-        {isGvcn && (
-          <button
-            onClick={() => setShowBonusModal(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-emerald-950 font-bold text-xs sm:text-sm shadow-md transition active:scale-95 cursor-pointer shrink-0"
-          >
-            <Gift className="w-4 h-4 text-emerald-950" />
-            <span>Trao điểm thưởng tổ</span>
-          </button>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-3 py-2.5 text-xs font-bold text-white">
+            <Calendar className="h-4 w-4 text-amber-300" />
+            <span>Xem tháng</span>
+            <select
+              aria-label="Chọn tháng xem thi đua theo tổ"
+              value={selectedMonth}
+              onChange={(event) => onSelectMonth(Number(event.target.value))}
+              className="rounded-lg border border-emerald-600 bg-emerald-950 px-2 py-1 font-black text-white outline-none"
+            >
+              {[8, 9, 10, 11, 12, 1, 2, 3, 4, 5].map((month) => (
+                <option key={month} value={month}>Tháng {month}</option>
+              ))}
+            </select>
+          </label>
+          {isGvcn && (
+            <button
+              onClick={() => setShowBonusModal(true)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-emerald-950 font-bold text-xs sm:text-sm shadow-md transition active:scale-95 cursor-pointer shrink-0"
+            >
+              <Gift className="w-4 h-4 text-emerald-950" />
+              <span>Trao điểm thưởng tổ</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Visual 3D-styled Podium */}
@@ -126,7 +145,7 @@ export const GroupCompetitionModule: React.FC<GroupCompetitionModuleProps> = ({
                 <span className="font-black text-sm sm:text-lg">🥈 2</span>
               </div>
               <div className="text-center font-black text-slate-800 text-xs sm:text-sm">{rank2.groupName}</div>
-              <div className="text-xs sm:text-base font-black text-slate-600 mb-2">+{rank2.grandTotal}đ</div>
+              <div className="text-xs sm:text-base font-black text-slate-600 mb-2">{formatAveragePoints(rank2.grandTotal)} điểm TB</div>
               <div className="w-full bg-gradient-to-t from-slate-300 to-slate-200 h-28 sm:h-36 rounded-t-2xl flex items-center justify-center shadow-inner text-slate-600 font-black text-sm sm:text-base border-t-2 border-slate-400">
                 HẠNG NHÌ
               </div>
@@ -143,7 +162,7 @@ export const GroupCompetitionModule: React.FC<GroupCompetitionModuleProps> = ({
                 </div>
               </div>
               <div className="text-center font-black text-emerald-950 text-sm sm:text-base">{rank1.groupName}</div>
-              <div className="text-sm sm:text-lg font-black text-amber-600 mb-2">+{rank1.grandTotal}đ</div>
+              <div className="text-sm sm:text-lg font-black text-amber-600 mb-2">{formatAveragePoints(rank1.grandTotal)} điểm TB</div>
               <div className="w-full bg-gradient-to-t from-amber-400 to-amber-300 h-36 sm:h-48 rounded-t-2xl flex items-center justify-center shadow-md text-emerald-950 font-black text-base sm:text-lg border-t-4 border-amber-500">
                 HẠNG NHẤT
               </div>
@@ -157,7 +176,7 @@ export const GroupCompetitionModule: React.FC<GroupCompetitionModuleProps> = ({
                 <span className="font-black text-sm sm:text-lg">🥉 3</span>
               </div>
               <div className="text-center font-black text-slate-800 text-xs sm:text-sm">{rank3.groupName}</div>
-              <div className="text-xs sm:text-base font-black text-orange-700 mb-2">+{rank3.grandTotal}đ</div>
+              <div className="text-xs sm:text-base font-black text-orange-700 mb-2">{formatAveragePoints(rank3.grandTotal)} điểm TB</div>
               <div className="w-full bg-gradient-to-t from-orange-300 to-orange-200 h-20 sm:h-28 rounded-t-2xl flex items-center justify-center shadow-inner text-orange-900 font-black text-sm sm:text-base border-t-2 border-orange-400">
                 HẠNG BA
               </div>
@@ -171,7 +190,7 @@ export const GroupCompetitionModule: React.FC<GroupCompetitionModuleProps> = ({
           <div className="max-w-md mx-auto mt-4 p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-center flex items-center justify-between px-6">
             <span className="text-xs font-bold text-slate-600">🏅 Hạng Tư (Cố lên):</span>
             <span className="font-black text-sm text-emerald-950">{rank4.groupName}</span>
-            <span className="font-bold text-sm text-emerald-800">+{rank4.grandTotal}đ</span>
+            <span className="font-bold text-sm text-emerald-800">{formatAveragePoints(rank4.grandTotal)} điểm TB</span>
           </div>
         )}
       </div>
@@ -193,9 +212,9 @@ export const GroupCompetitionModule: React.FC<GroupCompetitionModuleProps> = ({
                 <th className="p-3 text-center">Tuần 2</th>
                 <th className="p-3 text-center">Tuần 3</th>
                 <th className="p-3 text-center">Tuần 4</th>
-                <th className="p-3 text-center">Điểm cá nhân</th>
+                <th className="p-3 text-center">TB cá nhân/HS</th>
                 <th className="p-3 text-center">Điểm thưởng tổ</th>
-                <th className="p-3 text-center font-black">Tổng điểm</th>
+                <th className="p-3 text-center font-black">Điểm xếp hạng</th>
                 <th className="p-3 text-right">Danh sách</th>
               </tr>
             </thead>
@@ -223,25 +242,25 @@ export const GroupCompetitionModule: React.FC<GroupCompetitionModuleProps> = ({
                         {g.memberCount} HS
                       </td>
                       <td className="p-3 text-center font-semibold text-slate-700">
-                        {formatSignedPoints(g.weekScores[1] || 0, 'đ')}
+                        {formatSignedPoints(g.weekAverages[1] || 0, 'đ')}
                       </td>
                       <td className="p-3 text-center font-semibold text-slate-700">
-                        {formatSignedPoints(g.weekScores[2] || 0, 'đ')}
+                        {formatSignedPoints(g.weekAverages[2] || 0, 'đ')}
                       </td>
                       <td className="p-3 text-center font-semibold text-slate-700">
-                        {formatSignedPoints(g.weekScores[3] || 0, 'đ')}
+                        {formatSignedPoints(g.weekAverages[3] || 0, 'đ')}
                       </td>
                       <td className="p-3 text-center font-semibold text-slate-700">
-                        {formatSignedPoints(g.weekScores[4] || 0, 'đ')}
+                        {formatSignedPoints(g.weekAverages[4] || 0, 'đ')}
                       </td>
                       <td className="p-3 text-center font-bold text-slate-800">
-                        {g.memberPointsTotal}đ
+                        {formatAveragePoints(g.memberPointsAverage)}đ
                       </td>
                       <td className="p-3 text-center font-bold text-emerald-700">
                         +{g.bonusPointsTotal}đ
                       </td>
                       <td className="p-3 text-center font-black text-sm text-amber-600 whitespace-nowrap">
-                        {g.grandTotal}đ
+                        {formatAveragePoints(g.grandTotal)}đ
                       </td>
                       <td className="p-3 text-right">
                         <button

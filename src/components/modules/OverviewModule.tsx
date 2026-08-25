@@ -17,13 +17,14 @@ import {
   Sparkle
 } from 'lucide-react';
 import { FullClassData } from '../../types';
-import { computeStudentScores, computeGroupStandings, formatSignedPoints } from '../../utils/calculations';
+import { computeStudentScores, computeGroupStandings, formatAveragePoints, formatSignedPoints } from '../../utils/calculations';
 import { ModuleTab } from '../Navigation';
 
 interface OverviewModuleProps {
   data: FullClassData;
   selectedMonth: number;
   selectedWeek: number;
+  onSelectMonth: (month: number) => void;
   onNavigate: (tab: ModuleTab) => void;
 }
 
@@ -31,6 +32,7 @@ export const OverviewModule: React.FC<OverviewModuleProps> = ({
   data,
   selectedMonth,
   selectedWeek,
+  onSelectMonth,
   onNavigate,
 }) => {
   const students = data.students || [];
@@ -156,20 +158,36 @@ export const OverviewModule: React.FC<OverviewModuleProps> = ({
 
       {/* Group Competitions Standings Strip */}
       <div className="bg-white rounded-[24px] p-6 shadow-sm border border-emerald-100">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
           <div className="flex items-center gap-2">
             <Trophy className="w-5 h-5 text-amber-500" />
             <h3 className="text-lg font-black text-emerald-950 tracking-tight">
               Bảng Xếp Hạng Thi Đua 4 Tổ (Tháng {selectedMonth})
             </h3>
           </div>
-          <button
-            onClick={() => onNavigate('group_competition')}
-            className="text-xs font-bold text-emerald-700 hover:text-emerald-900 flex items-center gap-1"
-          >
-            <span>Chi tiết bục vinh quang</span>
-            <ArrowUpRight className="w-4 h-4" />
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-900">
+              <Calendar className="h-4 w-4" />
+              <span>Xem tháng</span>
+              <select
+                aria-label="Chọn tháng xem bảng xếp hạng tổ"
+                value={selectedMonth}
+                onChange={(event) => onSelectMonth(Number(event.target.value))}
+                className="rounded-lg border border-emerald-200 bg-white px-2 py-1 font-black text-emerald-950 outline-none"
+              >
+                {[8, 9, 10, 11, 12, 1, 2, 3, 4, 5].map((month) => (
+                  <option key={month} value={month}>Tháng {month}</option>
+                ))}
+              </select>
+            </label>
+            <button
+              onClick={() => onNavigate('group_competition')}
+              className="text-xs font-bold text-emerald-700 hover:text-emerald-900 flex items-center gap-1"
+            >
+              <span>Chi tiết bục vinh quang</span>
+              <ArrowUpRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -193,10 +211,10 @@ export const OverviewModule: React.FC<OverviewModuleProps> = ({
                   </span>
                 </div>
                 <div className="text-3xl font-black tracking-tight mt-2">
-                  {g.grandTotal} <span className="text-xs font-normal text-slate-500">điểm</span>
+                  {formatAveragePoints(g.grandTotal)} <span className="text-xs font-normal text-slate-500">điểm xếp hạng</span>
                 </div>
-                <div className="flex items-center justify-between text-xs text-slate-600 mt-3 pt-2 border-t border-slate-200/60">
-                  <span>Cá nhân: {g.memberPointsTotal}đ</span>
+                <div className="flex flex-wrap items-center justify-between gap-1 text-xs text-slate-600 mt-3 pt-2 border-t border-slate-200/60">
+                  <span>TB/HS: {formatAveragePoints(g.memberPointsAverage)}đ ({g.memberCount} HS)</span>
                   <span className="font-semibold text-emerald-700">+Thưởng: {g.bonusPointsTotal}đ</span>
                 </div>
               </div>
