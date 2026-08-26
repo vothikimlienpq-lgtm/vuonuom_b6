@@ -11,7 +11,8 @@ import {
   Volume2, 
   Shirt, 
   ChevronRight,
-  Sparkles
+  Sparkles,
+  Calendar
 } from 'lucide-react';
 import { FullClassData, Student, PointTransaction } from '../../types';
 import { computeStudentScores, formatSignedPoints, getSignedTransactionPoints } from '../../utils/calculations';
@@ -20,12 +21,14 @@ interface DisciplineViolationsModuleProps {
   data: FullClassData;
   selectedMonth: number;
   selectedWeek: number;
+  onSelectMonth: (month: number) => void;
 }
 
 export const DisciplineViolationsModule: React.FC<DisciplineViolationsModuleProps> = ({
   data,
   selectedMonth,
   selectedWeek,
+  onSelectMonth,
 }) => {
   const [selectedGroup, setSelectedGroup] = useState<number | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -73,6 +76,20 @@ export const DisciplineViolationsModule: React.FC<DisciplineViolationsModuleProp
             Dữ liệu tự động tổng hợp từ nhật ký ghi nhận điểm tuần, minh bạch và có thể truy xuất từng lần vi phạm.
           </p>
         </div>
+        <label className="flex items-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-3 py-2.5 text-xs font-bold text-white shrink-0">
+          <Calendar className="h-4 w-4 text-amber-300" />
+          <span>Xem tháng</span>
+          <select
+            value={selectedMonth}
+            onChange={(event) => onSelectMonth(Number(event.target.value))}
+            className="rounded-lg border border-emerald-600 bg-emerald-950 px-2 py-1 font-black text-white outline-none"
+            aria-label="Chọn tháng xem vi phạm rèn luyện"
+          >
+            {[8, 9, 10, 11, 12, 1, 2, 3, 4, 5].map((month) => (
+              <option key={month} value={month}>Tháng {month}</option>
+            ))}
+          </select>
+        </label>
       </div>
 
       {/* 6 Core Violation KPI Counters */}

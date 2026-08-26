@@ -8,7 +8,8 @@ import {
   AlertCircle, 
   TrendingUp,
   BookOpen,
-  Award
+  Award,
+  Calendar
 } from 'lucide-react';
 import { FullClassData } from '../../types';
 import { computeStudentScores } from '../../utils/calculations';
@@ -17,12 +18,14 @@ interface AcademicMonitoringModuleProps {
   data: FullClassData;
   selectedMonth: number;
   selectedWeek: number;
+  onSelectMonth: (month: number) => void;
 }
 
 export const AcademicMonitoringModule: React.FC<AcademicMonitoringModuleProps> = ({
   data,
   selectedMonth,
   selectedWeek,
+  onSelectMonth,
 }) => {
   const [selectedGroup, setSelectedGroup] = useState<number | 'all'>('all');
   const [selectedSubject, setSelectedSubject] = useState<string | 'all'>('all');
@@ -74,6 +77,20 @@ export const AcademicMonitoringModule: React.FC<AcademicMonitoringModuleProps> =
             Tổng hợp tình hình phát biểu, làm bài tập về nhà, trả bài miệng và điểm số cao của từng thành viên.
           </p>
         </div>
+        <label className="flex items-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-3 py-2.5 text-xs font-bold text-white shrink-0">
+          <Calendar className="h-4 w-4 text-amber-300" />
+          <span>Xem tháng</span>
+          <select
+            value={selectedMonth}
+            onChange={(event) => onSelectMonth(Number(event.target.value))}
+            className="rounded-lg border border-emerald-600 bg-emerald-950 px-2 py-1 font-black text-white outline-none"
+            aria-label="Chọn tháng xem theo dõi học tập"
+          >
+            {[8, 9, 10, 11, 12, 1, 2, 3, 4, 5].map((month) => (
+              <option key={month} value={month}>Tháng {month}</option>
+            ))}
+          </select>
+        </label>
       </div>
 
       {/* 4 Academic KPI Counters */}

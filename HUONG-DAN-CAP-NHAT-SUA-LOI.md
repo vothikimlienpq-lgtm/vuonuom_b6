@@ -8,7 +8,7 @@
 4. Mục thứ hạng trường có nút **Cập nhật thứ hạng**, chọn tuần, nhập điểm bị trừ và lý do.
 5. Báo bài và thời khóa biểu lưu đầy đủ tháng/tuần, hiển thị ngay sau khi ghi, đồng thời có nút sửa và xóa tại từng tiết.
 6. Thanh điều khiển xem trước bản in không còn che tên học sinh; tên GVCN và năm ký được lấy từ cấu hình lớp.
-7. Mục **Thứ hạng trường & khối** có nút chọn trực tiếp từng tuần và hiển thị đúng dữ liệu của tuần đang chọn.
+7. Mục **Thứ hạng trường & khối** hiển thị nút chọn đủ toàn bộ tuần của năm học (theo tổng số tuần đã cài đặt), kèm tháng, khoảng ngày và trạng thái đã/chưa cập nhật; bấm tuần nào sẽ hiển thị đúng dữ liệu tuần đó.
 8. Phần **Báo bài & Thời khóa biểu** cho phép tự nhập tên môn học, không còn phụ thuộc danh sách môn cố định.
 9. Chức năng **Thêm quy định mới** đã sửa lỗi Firestore từ chối trường dữ liệu trống; có kiểm tra nội dung, điểm, lĩnh vực và trạng thái đang lưu rõ ràng.
 10. Mục **Rèn luyện cá nhân** có thêm chế độ **Học kỳ & Cả năm**:
@@ -28,6 +28,11 @@
 15. Mục **Đổi mật khẩu** hỗ trợ cả GVCN, Ban cán sự và Thành viên lớp. Với tài khoản BCS/Thành viên, hệ thống yêu cầu mật khẩu hiện tại trước khi đổi và chỉ thao tác trên tài khoản đang hoạt động của đúng lớp.
 16. Ngày, tháng, năm trên phiếu in tự động cập nhật theo đúng ngày giáo viên bấm **In ngay**.
 17. Cấu hình thời khóa biểu có thêm lựa chọn **10 tiết (Sáng 1–5 + Chiều 1–5)**. Hệ thống phân biệt tiết sáng/chiều bằng buổi học nên không ghi đè hai tiết có cùng số; dữ liệu kiểu cũ 6–10 vẫn được đọc tương thích.
+18. Lịch sử giao dịch điểm được chia thành từng **Thứ 2 → Thứ 7**, hiển thị ngày thực tế, số giao dịch và trạng thái khóa của từng ngày.
+19. Khi GVCN khóa một ngày hoặc một tuần, các giao dịch thuộc phạm vi đó không thể ghi thêm, sửa hoặc xóa; cần mở khóa trước khi thay đổi lịch sử.
+20. Hai quy định **Không thuộc bài hoặc học đối phó** và **Không chuẩn bị bài, thiếu bài tập hoặc đồ dùng** cho phép tự nhập tên môn học, không còn bắt buộc chọn từ danh sách môn cố định.
+21. Phiếu theo dõi có bộ chọn phạm vi **Tuần / Tháng / Học kỳ / Cả năm học**; nhật ký in đầy đủ, ghi rõ loại sự kiện, môn, hình thức, lý do và sắp xếp theo ngày thực tế từ ngày 1 đến ngày n.
+22. Ba mục **Vi phạm rèn luyện**, **Theo dõi học tập** và **Rèn luyện cá nhân** có bộ chọn tháng ngay trong màn hình để xem lại dữ liệu các tháng trước.
 
 ## Cách kiểm tra trên máy
 
@@ -55,6 +60,10 @@ Sau đó mở địa chỉ Vite hiển thị trong Terminal và kiểm tra lần
 - Chọn cấu hình **10 tiết (Sáng 1–5 + Chiều 1–5)**, ghi thử Tiết 1 buổi sáng và Tiết 1 buổi chiều trong cùng ngày; xác nhận hai tiết được lưu và hiển thị độc lập.
 - Vào Cài đặt → Thông tin lớp, nhập tổng số tuần và số tuần HKI rồi lưu; mở Rèn luyện cá nhân → Học kỳ & Cả năm để kiểm tra phạm vi tuần và kết quả tổng hợp.
 - Mở bản xem trước phiếu học sinh và kiểm tra tên học sinh, tên GVCN.
+- Khóa một ngày đã có điểm; kiểm tra nhóm lịch sử của ngày đó hiện **Đã khóa điểm** và không còn nút xóa. Mở khóa rồi kiểm tra nút xóa xuất hiện lại.
+- Chọn hai quy định không thuộc bài/thiếu chuẩn bị, tự gõ tên môn rồi lưu và kiểm tra tên môn trong lịch sử.
+- Mở phiếu in, lần lượt chọn Tuần, Tháng, Học kỳ và Cả năm; kiểm tra nhật ký đổi đúng phạm vi và các ngày được sắp xếp tăng dần.
+- Đổi tháng ngay tại Vi phạm rèn luyện, Theo dõi học tập và Rèn luyện cá nhân; kiểm tra tiêu đề và số liệu cùng đổi theo tháng.
 
 ## Đưa lên GitHub Pages
 

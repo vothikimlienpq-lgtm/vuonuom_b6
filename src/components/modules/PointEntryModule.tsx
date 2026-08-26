@@ -44,6 +44,15 @@ const EXAM_TYPES = [
   'Đánh giá thường xuyên'
 ];
 
+const isFreeTextSubjectRule = (rule: PointRule | null): boolean => {
+  if (!rule) return false;
+  if (rule.id === 'R_MINUS_01' || rule.id === 'R_MINUS_02') return true;
+  const content = rule.content.toLocaleLowerCase('vi-VN');
+  return content.includes('không thuộc bài')
+    || content.includes('không chuẩn bị bài')
+    || content.includes('thiếu bài tập');
+};
+
 interface PointEntryModuleProps {
   data: FullClassData;
   selectedMonth: number;
@@ -83,7 +92,7 @@ export const PointEntryModule: React.FC<PointEntryModuleProps> = ({
   const [selectedRule, setSelectedRule] = useState<PointRule | null>(null);
   const [quantity, setQuantity] = useState<number>(1);
   const [flexiblePoints, setFlexiblePoints] = useState<number>(5);
-  const [subject, setSubject] = useState<string>('Toán');
+  const [subject, setSubject] = useState<string>('');
   const [examType, setExamType] = useState<string>('Kiểm tra 15 phút');
   const [reason, setReason] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
@@ -115,6 +124,25 @@ export const PointEntryModule: React.FC<PointEntryModuleProps> = ({
 
   // Filter transactions for history table
   const weekTransactions = transactions.filter(t => t.month === selectedMonth && t.week === selectedWeek);
+  const isTransactionLocked = (transaction: PointTransaction) => isWeekLocked || dayLocks.some((lock) => (
+    lock.month === transaction.month
+    && lock.week === transaction.week
+    && lock.dayOfWeek === transaction.dayOfWeek
+    && lock.isLocked
+  ));
+  const transactionGroups = DAYS_OF_WEEK.map((day) => ({
+    day,
+    date: weekInfo.dayDates[day],
+    locked: isWeekLocked || dayLocks.some((lock) => (
+      lock.month === selectedMonth
+      && lock.week === selectedWeek
+      && lock.dayOfWeek === day
+      && lock.isLocked
+    )),
+    transactions: weekTransactions
+      .filter((transaction) => transaction.dayOfWeek === day)
+      .sort((first, second) => new Date(first.createdAt).getTime() - new Date(second.createdAt).getTime()),
+  })).filter((group) => group.transactions.length > 0);
 
   const handleOpenRecordModal = (student: Student) => {
     if (!canEdit) {
@@ -125,7 +153,7 @@ export const PointEntryModule: React.FC<PointEntryModuleProps> = ({
       error(`Tuần ${selectedWeek} đã bị khóa. Không thể ghi nhận thêm.`);
       return;
     }
-    if (isDayLocked && !isGvcn) {
+    if (isDayLocked) {
       error(`${selectedDay} đã bị hoàn tất & khóa bởi ${currentDayLock?.lockedBy}.`);
       return;
     }
@@ -144,7 +172,7 @@ export const PointEntryModule: React.FC<PointEntryModuleProps> = ({
       warning('Bạn cần đăng nhập vai trò Ban cán sự hoặc GVCN để ghi nhận điểm.');
       return;
     }
-    if (isWeekLocked || (isDayLocked && !isGvcn)) {
+    if (isWeekLocked || isDayLocked) {
       error('Ngày hoặc tuần này đang bị khóa, không thể ghi nhận thêm.');
       return;
     }
@@ -185,6 +213,11 @@ export const PointEntryModule: React.FC<PointEntryModuleProps> = ({
       return;
     }
 
+    if (selectedRule.requiresSubjectAndExamType && !subject.trim()) {
+      error('Vui lòng tự nhập tên môn học.');
+      return;
+    }
+
     setSubmitting(true);
     try {
       for (const student of targetStudents) {
@@ -200,7 +233,7 @@ export const PointEntryModule: React.FC<PointEntryModuleProps> = ({
           type: selectedRule.type,
           points: selectedRule.isFlexiblePoints ? flexiblePoints : selectedRule.defaultPoints,
           quantity,
-          subject: selectedRule.requiresSubjectAndExamType ? subject : undefined,
+          subject: selectedRule.requiresSubjectAndExamType ? subject.trim() : undefined,
           examType: selectedRule.requiresSubjectAndExamType ? examType : undefined,
           reason: reason.trim() || undefined,
         });
@@ -219,6 +252,10 @@ export const PointEntryModule: React.FC<PointEntryModuleProps> = ({
   };
 
   const handleDeleteTransaction = async (tx: PointTransaction) => {
+    if (isTransactionLocked(tx)) {
+      error(`${tx.dayOfWeek} đã được khóa điểm. GVCN cần mở khóa ngày trước khi sửa lịch sử.`);
+      return;
+    }
     if (!window.confirm(`Bạn có chắc chắn muốn xóa bản ghi điểm "${tx.ruleContent}" của học sinh ${tx.studentName}?`)) {
       return;
     }
@@ -456,7 +493,7 @@ export const PointEntryModule: React.FC<PointEntryModuleProps> = ({
               <button
                 type="button"
                 onClick={handleOpenBulkRecordModal}
-                disabled={isWeekLocked || (isDayLocked && !isGvcn)}
+                disabled={isWeekLocked || isDayLocked}
                 className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-amber-400 text-emerald-950 text-xs font-black hover:bg-amber-300 disabled:opacity-50"
               >
                 <UserCheck className="w-4 h-4" />
@@ -512,7 +549,7 @@ export const PointEntryModule: React.FC<PointEntryModuleProps> = ({
 
                 <button
                   onClick={() => handleOpenRecordModal(student)}
-                  disabled={!canEdit || isWeekLocked || (isDayLocked && !isGvcn)}
+                  disabled={!canEdit || isWeekLocked || isDayLocked}
                   className="mt-3 w-full py-2 px-3 rounded-xl bg-[#064e3b] hover:bg-[#095c47] text-amber-300 font-bold text-xs shadow-sm transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <PlusCircle className="w-3.5 h-3.5" />
@@ -560,11 +597,30 @@ export const PointEntryModule: React.FC<PointEntryModuleProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 bg-white">
-                {weekTransactions.map(tx => {
-                  const isPlus = tx.type === 'plus';
-
-                  return (
-                    <tr key={tx.id} className="hover:bg-slate-50 transition">
+                {transactionGroups.map((group) => (
+                  <React.Fragment key={group.day}>
+                    <tr className={group.locked ? 'bg-rose-50' : 'bg-emerald-50'}>
+                      <td colSpan={canEdit ? 8 : 7} className="px-3 py-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2 font-black text-emerald-950">
+                            <Calendar className="w-4 h-4" />
+                            <span>{group.day} • {group.date}</span>
+                            <span className="text-[10px] font-bold text-slate-500">({group.transactions.length} giao dịch)</span>
+                          </div>
+                          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-black ${
+                            group.locked ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'
+                          }`}>
+                            {group.locked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
+                            {group.locked ? 'Đã khóa điểm' : 'Đang mở'}
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                    {group.transactions.map(tx => {
+                      const isPlus = tx.type === 'plus';
+                      const transactionLocked = isTransactionLocked(tx);
+                      return (
+                    <tr key={tx.id} className={`${transactionLocked ? 'bg-slate-50/80' : 'hover:bg-slate-50'} transition`}>
                       <td className="p-3 font-medium text-slate-700 whitespace-nowrap">
                         <div className="font-bold text-slate-900">{tx.dayOfWeek}</div>
                         <div className="text-[10px] text-slate-400">
@@ -617,7 +673,7 @@ export const PointEntryModule: React.FC<PointEntryModuleProps> = ({
                       </td>
                       {canEdit && (
                         <td className="p-3 text-right whitespace-nowrap">
-                          {!isWeekLocked && (
+                          {!transactionLocked ? (
                             <button
                               onClick={() => handleDeleteTransaction(tx)}
                               className="p-1.5 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg transition"
@@ -625,12 +681,18 @@ export const PointEntryModule: React.FC<PointEntryModuleProps> = ({
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-500" title="Ngày này đã khóa điểm">
+                              <Lock className="w-3.5 h-3.5" /> Khóa
+                            </span>
                           )}
                         </td>
                       )}
                     </tr>
-                  );
-                })}
+                      );
+                    })}
+                  </React.Fragment>
+                ))}
               </tbody>
             </table>
           </div>
@@ -737,7 +799,10 @@ export const PointEntryModule: React.FC<PointEntryModuleProps> = ({
                       return (
                         <div
                           key={r.id}
-                          onClick={() => setSelectedRule(r)}
+                          onClick={() => {
+                            setSelectedRule(r);
+                            setSubject(isFreeTextSubjectRule(r) ? '' : (subject.trim() || subjects[0] || ''));
+                          }}
                           className={`p-2.5 rounded-xl border text-xs font-medium cursor-pointer transition flex items-center justify-between gap-2 ${
                             isSelected
                               ? isPlus
@@ -811,15 +876,27 @@ export const PointEntryModule: React.FC<PointEntryModuleProps> = ({
                         <label className="block text-xs font-bold text-slate-700 mb-1">
                           Môn học:
                         </label>
-                        <select
-                          value={subject}
-                          onChange={(e) => setSubject(e.target.value)}
-                          className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold bg-white"
-                        >
-                          {subjects.map(s => (
-                            <option key={s} value={s}>{s}</option>
-                          ))}
-                        </select>
+                        {isFreeTextSubjectRule(selectedRule) ? (
+                          <input
+                            type="text"
+                            value={subject}
+                            onChange={(e) => setSubject(e.target.value)}
+                            placeholder="Tự nhập tên môn học..."
+                            className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold bg-white"
+                            required
+                          />
+                        ) : (
+                          <select
+                            value={subject}
+                            onChange={(e) => setSubject(e.target.value)}
+                            className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold bg-white"
+                          >
+                            <option value="">Chọn môn học</option>
+                            {subjects.map(s => (
+                              <option key={s} value={s}>{s}</option>
+                            ))}
+                          </select>
+                        )}
                       </div>
 
                       <div>

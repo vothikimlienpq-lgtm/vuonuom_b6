@@ -1070,6 +1070,18 @@ export const api = {
       if (!safeRuleContent || (safeType !== 'plus' && safeType !== 'minus') || !Number.isFinite(safePoints)) {
         throw new Error('Quy định điểm chưa đầy đủ. Vui lòng chọn lại quy định trước khi lưu.');
       }
+      const dayLocked = latestFullData.dayLocks.some((lock) => (
+        lock.month === payload.month
+        && lock.week === payload.week
+        && lock.dayOfWeek === payload.dayOfWeek
+        && lock.isLocked
+      ));
+      const weekLocked = latestFullData.weekLocks.some((lock) => (
+        lock.month === payload.month && lock.week === payload.week && lock.isLocked
+      ));
+      if (dayLocked || weekLocked) {
+        throw new Error('Ngày hoặc tuần này đã khóa điểm. GVCN cần mở khóa trước khi ghi thêm.');
+      }
 
       const qty = Math.max(1, Math.abs(Number(payload.quantity) || 1));
       const absoluteTotal = safePoints * qty;
@@ -1127,6 +1139,15 @@ export const api = {
       const txDocRef = doc(transactionsColRef, id);
       const existing = latestFullData.transactions.find((tx) => tx.id === id);
       const merged = { ...(existing || {}), ...payload, id } as PointTransaction;
+      const locked = latestFullData.weekLocks.some((lock) => (
+        lock.month === merged.month && lock.week === merged.week && lock.isLocked
+      )) || latestFullData.dayLocks.some((lock) => (
+        lock.month === merged.month
+        && lock.week === merged.week
+        && lock.dayOfWeek === merged.dayOfWeek
+        && lock.isLocked
+      ));
+      if (locked) throw new Error('Giao dịch thuộc ngày hoặc tuần đã khóa, không thể chỉnh sửa.');
       const normalizedPoints = Math.abs(Number(merged.points) || 0);
       const normalizedQuantity = Math.max(1, Math.abs(Number(merged.quantity) || 1));
       const normalizedPayload = {
@@ -1161,6 +1182,16 @@ export const api = {
   deleteTransaction: async (id: string): Promise<{ success: boolean; message: string }> => {
     try {
       const existing = latestFullData.transactions.find((tx) => tx.id === id);
+      if (!existing) throw new Error('Không tìm thấy giao dịch điểm cần xóa.');
+      const locked = latestFullData.weekLocks.some((lock) => (
+        lock.month === existing.month && lock.week === existing.week && lock.isLocked
+      )) || latestFullData.dayLocks.some((lock) => (
+        lock.month === existing.month
+        && lock.week === existing.week
+        && lock.dayOfWeek === existing.dayOfWeek
+        && lock.isLocked
+      ));
+      if (locked) throw new Error('Giao dịch thuộc ngày hoặc tuần đã khóa, không thể xóa.');
       await deleteDoc(doc(transactionsColRef, id));
       latestFullData.transactions = latestFullData.transactions.filter((tx) => tx.id !== id);
       if (existing?.studentId) await safelySyncParentViewForStudent(existing.studentId);

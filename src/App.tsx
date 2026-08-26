@@ -128,6 +128,15 @@ function MainAppContent() {
   const handleSelectMonth = (month: number) => {
     hasManualWeekSelection.current = true;
     setSelectedMonth(month);
+    if (data?.config?.week1StartDate) {
+      const currentWeekMonth = getWeekDateRange(data.config.week1StartDate, selectedWeek).monthNum;
+      if (currentWeekMonth !== month) {
+        const totalWeeks = Math.max(1, Number(data.config.totalWeeks) || 38);
+        const firstWeekInMonth = Array.from({ length: totalWeeks }, (_, index) => index + 1)
+          .find((week) => getWeekDateRange(data.config.week1StartDate, week).monthNum === month);
+        if (firstWeekInMonth) setSelectedWeek(firstWeekInMonth);
+      }
+    }
   };
 
   const handleLogout = async () => {
@@ -279,6 +288,7 @@ function MainAppContent() {
                 data={data}
                 selectedMonth={selectedMonth}
                 selectedWeek={selectedWeek}
+                onSelectMonth={handleSelectMonth}
               />
             )}
 
@@ -287,6 +297,7 @@ function MainAppContent() {
                 data={data}
                 selectedMonth={selectedMonth}
                 selectedWeek={selectedWeek}
+                onSelectMonth={handleSelectMonth}
               />
             )}
 
@@ -322,6 +333,7 @@ function MainAppContent() {
                 userRole={session?.role || 'guest'}
                 session={session}
                 onNavigate={setActiveTab}
+                onSelectMonth={handleSelectMonth}
               />
             )}
 

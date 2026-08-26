@@ -48,15 +48,14 @@ export const SchoolRankingModule: React.FC<SchoolRankingModuleProps> = ({
   const isGvcn = userRole === 'gvcn';
   const rankings = data.schoolRankings || [];
   const totalWeeks = Math.max(4, Number(data.config.totalWeeks) || 4);
-  const monthWeeks = Array.from({ length: totalWeeks }, (_, index) => index + 1)
-    .filter(week => getWeekDateRange(data.config.week1StartDate, week).monthNum === selectedMonth);
+  const allWeeks = Array.from({ length: totalWeeks }, (_, index) => index + 1);
   const selectedWeekMonth = getWeekDateRange(data.config.week1StartDate, selectedWeek).monthNum;
   const selectedRank = rankings.find(
     record => record.week === selectedWeek && record.month === selectedWeekMonth
   );
 
   const openUpdateModal = () => {
-    const existing = rankings.find(record => record.month === selectedMonth && record.week === selectedWeek);
+    const existing = rankings.find(record => record.month === selectedWeekMonth && record.week === selectedWeek);
     setModalWeek(selectedWeek);
     setSchoolRank(existing?.schoolRank || 1);
     setTotalSchoolClasses(existing?.totalSchoolClasses || 36);
@@ -149,7 +148,7 @@ export const SchoolRankingModule: React.FC<SchoolRankingModuleProps> = ({
               <span>Chọn tuần cần xem</span>
             </h3>
             <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">
-              Bấm trực tiếp vào tuần để xem đúng kết quả thứ hạng và điểm bị trừ.
+              Hiển thị đủ {totalWeeks} tuần của năm học. Bấm tuần nào để xem đúng kết quả và điểm bị trừ của tuần đó.
             </p>
           </div>
           <div className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-full self-start sm:self-auto">
@@ -157,10 +156,11 @@ export const SchoolRankingModule: React.FC<SchoolRankingModuleProps> = ({
           </div>
         </div>
 
-        {monthWeeks.length > 0 ? (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-            {monthWeeks.map(week => {
+        {allWeeks.length > 0 ? (
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2.5">
+            {allWeeks.map(week => {
               const weekMonth = getWeekDateRange(data.config.week1StartDate, week).monthNum;
+              const weekRange = getWeekDateRange(data.config.week1StartDate, week).rangeFormatted;
               const hasData = rankings.some(record => record.week === week && record.month === weekMonth);
               const isActive = selectedWeek === week;
 
@@ -169,27 +169,30 @@ export const SchoolRankingModule: React.FC<SchoolRankingModuleProps> = ({
                   key={week}
                   type="button"
                   onClick={() => onSelectWeek?.(week)}
-                  className={`min-h-[52px] px-4 py-3 rounded-2xl border-2 font-black text-sm transition-all active:scale-[0.98] flex items-center justify-center gap-2 ${
+                  className={`min-h-[62px] px-3 py-2.5 rounded-2xl border-2 font-black text-sm transition-all active:scale-[0.98] flex flex-col items-center justify-center gap-0.5 ${
                     isActive
                       ? 'bg-amber-400 border-amber-400 text-emerald-950 shadow-md'
                       : 'bg-slate-50 border-slate-200 text-slate-700 hover:border-emerald-400 hover:bg-emerald-50'
                   }`}
                   aria-pressed={isActive}
                 >
-                  <span>Tuần {week}</span>
-                  <span
-                    className={`w-2.5 h-2.5 rounded-full ${
-                      hasData ? 'bg-emerald-500' : 'bg-slate-300'
-                    }`}
-                    title={hasData ? 'Đã cập nhật dữ liệu' : 'Chưa cập nhật dữ liệu'}
-                  />
+                  <span className="inline-flex items-center gap-1.5">
+                    Tuần {week}
+                    <span
+                      className={`w-2.5 h-2.5 rounded-full ${hasData ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                      title={hasData ? 'Đã cập nhật dữ liệu' : 'Chưa cập nhật dữ liệu'}
+                    />
+                  </span>
+                  <span className={`text-[9px] font-bold ${isActive ? 'text-emerald-900' : 'text-slate-400'}`}>
+                    Tháng {weekMonth} • {weekRange}
+                  </span>
                 </button>
               );
             })}
           </div>
         ) : (
           <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4 text-sm text-slate-500 text-center">
-            Chưa xác định được các tuần thuộc tháng {selectedMonth}.
+            Chưa xác định được tuần nào trong năm học.
           </div>
         )}
 

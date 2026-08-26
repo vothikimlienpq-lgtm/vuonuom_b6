@@ -33,6 +33,7 @@ interface IndividualConductModuleProps {
   userRole?: UserRole;
   session?: UserSession | null;
   onNavigate?: (tab: ModuleTab) => void;
+  onSelectMonth: (month: number) => void;
 }
 
 export const IndividualConductModule: React.FC<IndividualConductModuleProps> = ({
@@ -42,6 +43,7 @@ export const IndividualConductModule: React.FC<IndividualConductModuleProps> = (
   userRole = 'guest',
   session,
   onNavigate,
+  onSelectMonth,
 }) => {
   const { success } = useToast();
   const [selectedGroup, setSelectedGroup] = useState<number | 'all'>('all');
@@ -89,10 +91,27 @@ export const IndividualConductModule: React.FC<IndividualConductModuleProps> = (
     </div>
   );
 
+  const monthSelector = (
+    <label className="flex items-center gap-2 rounded-2xl border border-emerald-100 bg-white px-3 py-2 text-xs font-bold text-emerald-950 shadow-sm">
+      <Calendar className="h-4 w-4 text-emerald-700" />
+      <span>Xem tháng</span>
+      <select
+        value={selectedMonth}
+        onChange={(event) => onSelectMonth(Number(event.target.value))}
+        className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 font-black text-emerald-950 outline-none"
+        aria-label="Chọn tháng xem rèn luyện cá nhân"
+      >
+        {[8, 9, 10, 11, 12, 1, 2, 3, 4, 5].map((month) => (
+          <option key={month} value={month}>Tháng {month}</option>
+        ))}
+      </select>
+    </label>
+  );
+
   if (viewMode === 'academicYear') {
     return (
       <div className="space-y-5">
-        <div className="flex justify-center sm:justify-start">{viewSwitcher}</div>
+        <div className="flex flex-wrap justify-center sm:justify-start gap-2">{viewSwitcher}{monthSelector}</div>
         <ConductYearSummary data={data} userRole={userRole} session={session} />
       </div>
     );
@@ -135,7 +154,7 @@ export const IndividualConductModule: React.FC<IndividualConductModuleProps> = (
 
     return (
       <div className="space-y-6">
-        <div className="flex justify-center sm:justify-start">{viewSwitcher}</div>
+        <div className="flex flex-wrap justify-center sm:justify-start gap-2">{viewSwitcher}{monthSelector}</div>
         
         {/* Parent Banner */}
         <div className="bg-gradient-to-br from-[#064e3b] via-[#095c47] to-[#043d2e] rounded-[28px] p-6 sm:p-8 text-white shadow-xl flex flex-col md:flex-row md:items-center md:justify-between gap-5 relative overflow-hidden">
@@ -434,7 +453,7 @@ export const IndividualConductModule: React.FC<IndividualConductModuleProps> = (
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-center sm:justify-start">{viewSwitcher}</div>
+      <div className="flex flex-wrap justify-center sm:justify-start gap-2">{viewSwitcher}{monthSelector}</div>
       
       {/* Header Banner */}
       <div className="bg-gradient-to-r from-[#064e3b] via-[#095c47] to-[#043d2e] rounded-[28px] p-6 sm:p-8 text-white shadow-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
