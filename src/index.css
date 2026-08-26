@@ -50,6 +50,8 @@
   }
 
   .page-break {
+    break-inside: avoid;
+    page-break-inside: avoid;
     break-after: page;
     page-break-after: always;
   }

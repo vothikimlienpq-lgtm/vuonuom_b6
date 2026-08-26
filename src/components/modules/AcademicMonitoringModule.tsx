@@ -28,12 +28,10 @@ export const AcademicMonitoringModule: React.FC<AcademicMonitoringModuleProps> =
   onSelectMonth,
 }) => {
   const [selectedGroup, setSelectedGroup] = useState<number | 'all'>('all');
-  const [selectedSubject, setSelectedSubject] = useState<string | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
   const students = data.students || [];
   const transactions = data.transactions || [];
-  const subjects = data.config?.subjects || [];
 
   const studentSummaries = computeStudentScores(students, transactions, selectedMonth);
 
@@ -45,8 +43,7 @@ export const AcademicMonitoringModule: React.FC<AcademicMonitoringModuleProps> =
       t.ruleContent.toLowerCase().includes('phát biểu') ||
       t.subject;
     const matchesMonth = t.month === selectedMonth;
-    const matchesSubject = selectedSubject === 'all' || t.subject === selectedSubject;
-    return isAcademic && matchesMonth && matchesSubject;
+    return isAcademic && matchesMonth;
   });
 
   const totalNoLesson = academicTxs.filter(t => t.ruleContent.toLowerCase().includes('không thuộc')).length;
@@ -171,17 +168,6 @@ export const AcademicMonitoringModule: React.FC<AcademicMonitoringModuleProps> =
               ))}
             </div>
 
-            {/* Subject Filter */}
-            <select
-              value={selectedSubject}
-              onChange={(e) => setSelectedSubject(e.target.value)}
-              className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold bg-slate-50 text-slate-800"
-            >
-              <option value="all">Tất cả môn học</option>
-              {subjects.map(s => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
           </div>
 
           <div className="relative min-w-[220px]">

@@ -31,8 +31,12 @@
 18. Lịch sử giao dịch điểm được chia thành từng **Thứ 2 → Thứ 7**, hiển thị ngày thực tế, số giao dịch và trạng thái khóa của từng ngày.
 19. Khi GVCN khóa một ngày hoặc một tuần, các giao dịch thuộc phạm vi đó không thể ghi thêm, sửa hoặc xóa; cần mở khóa trước khi thay đổi lịch sử.
 20. Hai quy định **Không thuộc bài hoặc học đối phó** và **Không chuẩn bị bài, thiếu bài tập hoặc đồ dùng** cho phép tự nhập tên môn học, không còn bắt buộc chọn từ danh sách môn cố định.
-21. Phiếu theo dõi có bộ chọn phạm vi **Tuần / Tháng / Học kỳ / Cả năm học**; nhật ký in đầy đủ, ghi rõ loại sự kiện, môn, hình thức, lý do và sắp xếp theo ngày thực tế từ ngày 1 đến ngày n.
+21. Phiếu theo dõi có bộ chọn phạm vi **Tuần / Tháng / Học kỳ / Cả năm học**:
+    - Khi in theo tuần, có nút chọn đủ toàn bộ tuần đã cài đặt và ghi chính xác ngày bắt đầu–kết thúc của tuần.
+    - Khi in theo tháng, học kỳ hoặc năm học, các giao dịch được gộp theo nội dung, số lượt và tổng điểm để trình bày gọn trên một mặt A4.
+    - Nhận xét GVCN tự tạo theo điểm tích cực, lỗi học tập, lỗi nề nếp và kết quả rèn luyện thực tế của từng học sinh.
 22. Ba mục **Vi phạm rèn luyện**, **Theo dõi học tập** và **Rèn luyện cá nhân** có bộ chọn tháng ngay trong màn hình để xem lại dữ liệu các tháng trước.
+23. Mục **Theo dõi học tập** đã bỏ bộ lọc chọn môn; hệ thống luôn tổng hợp đầy đủ dữ liệu học tập của tất cả môn trong tháng đang xem.
 
 ## Cách kiểm tra trên máy
 
@@ -62,7 +66,8 @@ Sau đó mở địa chỉ Vite hiển thị trong Terminal và kiểm tra lần
 - Mở bản xem trước phiếu học sinh và kiểm tra tên học sinh, tên GVCN.
 - Khóa một ngày đã có điểm; kiểm tra nhóm lịch sử của ngày đó hiện **Đã khóa điểm** và không còn nút xóa. Mở khóa rồi kiểm tra nút xóa xuất hiện lại.
 - Chọn hai quy định không thuộc bài/thiếu chuẩn bị, tự gõ tên môn rồi lưu và kiểm tra tên môn trong lịch sử.
-- Mở phiếu in, lần lượt chọn Tuần, Tháng, Học kỳ và Cả năm; kiểm tra nhật ký đổi đúng phạm vi và các ngày được sắp xếp tăng dần.
+- Mở phiếu in, chọn một tuần bất kỳ và kiểm tra khoảng ngày của tuần; tiếp tục chọn Tháng, Học kỳ và Cả năm để kiểm tra bảng tổng hợp rút gọn vừa một mặt A4.
+- Kiểm tra phần nhận xét GVCN thay đổi phù hợp giữa học sinh không vi phạm, học sinh thiếu bài và học sinh có lỗi nề nếp.
 - Đổi tháng ngay tại Vi phạm rèn luyện, Theo dõi học tập và Rèn luyện cá nhân; kiểm tra tiêu đề và số liệu cùng đổi theo tháng.
 
 ## Đưa lên GitHub Pages
