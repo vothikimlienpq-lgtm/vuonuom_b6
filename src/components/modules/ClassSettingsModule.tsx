@@ -117,6 +117,7 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
 
   // Add Rule Modal
   const [showAddRuleModal, setShowAddRuleModal] = useState(false);
+  const [editingRule, setEditingRule] = useState<PointRule | null>(null);
   const [newRuleContent, setNewRuleContent] = useState('');
   const [newRuleType, setNewRuleType] = useState<'plus' | 'minus'>('plus');
   const [newRulePoints, setNewRulePoints] = useState<number>(5);
@@ -247,7 +248,41 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
     }
   };
 
-  const handleSaveNewRule = async (e: React.FormEvent) => {
+  const resetRuleForm = () => {
+    setEditingRule(null);
+    setNewRuleContent('');
+    setNewRuleType('plus');
+    setNewRulePoints(5);
+    setNewRuleCategory('academic');
+    setRequiresReason(false);
+    setRequiresSubject(false);
+    setIsFlexible(false);
+  };
+
+  const openAddRuleModal = () => {
+    resetRuleForm();
+    setShowAddRuleModal(true);
+  };
+
+  const openEditRuleModal = (rule: PointRule) => {
+    setEditingRule(rule);
+    setNewRuleContent(rule.content);
+    setNewRuleType(rule.type);
+    setNewRulePoints(rule.defaultPoints);
+    setNewRuleCategory(rule.category);
+    setRequiresReason(Boolean(rule.requiresReason));
+    setRequiresSubject(Boolean(rule.requiresSubjectAndExamType));
+    setIsFlexible(Boolean(rule.isFlexiblePoints));
+    setShowAddRuleModal(true);
+  };
+
+  const closeRuleModal = () => {
+    if (savingRule) return;
+    setShowAddRuleModal(false);
+    resetRuleForm();
+  };
+
+  const handleSaveRule = async (e: React.FormEvent) => {
     e.preventDefault();
     const content = newRuleContent.trim();
     if (!content) {
@@ -262,6 +297,7 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
     setSavingRule(true);
     try {
       const res = await api.saveRule({
+        id: editingRule?.id,
         content,
         type: newRuleType,
         defaultPoints: newRulePoints,
@@ -269,22 +305,17 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
         requiresReason,
         requiresSubjectAndExamType: requiresSubject,
         isFlexiblePoints: isFlexible,
+        maxPerWeek: editingRule?.maxPerWeek,
         isActive: true,
       });
       if (res.success) {
-        success(res.message);
+        success(editingRule ? 'Đã cập nhật quy định thành công.' : res.message);
         setShowAddRuleModal(false);
-        setNewRuleContent('');
-        setNewRuleType('plus');
-        setNewRulePoints(5);
-        setNewRuleCategory('academic');
-        setRequiresReason(false);
-        setRequiresSubject(false);
-        setIsFlexible(false);
+        resetRuleForm();
         onRefresh();
       }
     } catch (err: any) {
-      error(err.message || 'Không thể thêm quy định mới. Vui lòng thử lại.');
+      error(err.message || `Không thể ${editingRule ? 'cập nhật' : 'thêm'} quy định. Vui lòng thử lại.`);
     } finally {
       setSavingRule(false);
     }
@@ -1044,7 +1075,7 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
               </p>
             </div>
             <button
-              onClick={() => setShowAddRuleModal(true)}
+              onClick={openAddRuleModal}
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-emerald-950 font-bold text-xs shadow cursor-pointer"
             >
               <Plus className="w-4 h-4" />
@@ -1085,13 +1116,22 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
                       {r.requiresReason ? '✓ Có' : '-'}
                     </td>
                     <td className="p-3 text-right">
-                      <button
-                        onClick={() => handleDeleteRule(r.id)}
-                        className="p-1 text-rose-600 hover:text-rose-800"
-                        title="Xóa quy định"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="inline-flex items-center gap-1">
+                        <button
+                          onClick={() => openEditRuleModal(r)}
+                          className="p-1.5 text-emerald-700 hover:text-emerald-900 hover:bg-emerald-50 rounded-lg transition"
+                          title="Sửa nội dung và số điểm quy định"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteRule(r.id)}
+                          className="p-1.5 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg transition"
+                          title="Xóa quy định"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -1296,7 +1336,7 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
       {/* Modal 1: Add Student */}
       {showAddStudentModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-emerald-950/70 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white rounded-[28px] max-w-md w-full p-6 shadow-2xl border border-emerald-100">
+          <div className="bg-white rounded-[28px] max-w-md w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl border border-emerald-100">
             <h3 className="text-lg font-black text-emerald-950 mb-4 flex items-center gap-2">
               <UserPlus className="w-5 h-5 text-amber-500" />
               <span>Thêm Học Sinh Vào Danh Sách Lớp</span>
@@ -1612,8 +1652,20 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
       {showAddRuleModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-emerald-950/70 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white rounded-[28px] max-w-md w-full p-6 shadow-2xl border border-emerald-100">
-            <h3 className="text-lg font-black text-emerald-950 mb-4">Thêm Quy Định Mới</h3>
-            <form onSubmit={handleSaveNewRule} className="space-y-3.5">
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div>
+                <h3 className="text-lg font-black text-emerald-950">
+                  {editingRule ? 'Sửa Quy Định Điểm' : 'Thêm Quy Định Mới'}
+                </h3>
+                {editingRule && (
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Mã quy định: <span className="font-mono font-bold">{editingRule.id}</span>. Lưu sẽ cập nhật đúng bản ghi này.
+                  </p>
+                )}
+              </div>
+              <button type="button" onClick={closeRuleModal} className="text-slate-400 hover:text-slate-700">✕</button>
+            </div>
+            <form onSubmit={handleSaveRule} className="space-y-3.5">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Nội dung quy định:</label>
                 <input
@@ -1684,7 +1736,7 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
                     onChange={(e) => setRequiresSubject(e.target.checked)}
                     className="rounded text-emerald-700"
                   />
-                  <span>Yêu cầu chọn Môn học & Hình thức kiểm tra</span>
+                  <span>Yêu cầu nhập Môn học & chọn Hình thức kiểm tra</span>
                 </label>
 
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -1702,7 +1754,7 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
                 <button
                   type="button"
                   disabled={savingRule}
-                  onClick={() => setShowAddRuleModal(false)}
+                  onClick={closeRuleModal}
                   className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 disabled:opacity-50"
                 >
                   Hủy
@@ -1712,7 +1764,7 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
                   disabled={savingRule || !newRuleContent.trim()}
                   className="px-5 py-2 rounded-xl bg-[#064e3b] text-amber-300 font-bold text-xs shadow disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {savingRule ? 'Đang lưu...' : 'Lưu quy định'}
+                  {savingRule ? 'Đang lưu...' : editingRule ? 'Cập nhật quy định' : 'Lưu quy định'}
                 </button>
               </div>
             </form>

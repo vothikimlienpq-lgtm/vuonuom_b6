@@ -46,11 +46,16 @@ const EXAM_TYPES = [
 
 const isFreeTextSubjectRule = (rule: PointRule | null): boolean => {
   if (!rule) return false;
-  if (rule.id === 'R_MINUS_01' || rule.id === 'R_MINUS_02') return true;
+  if (
+    rule.id === 'R_MINUS_01'
+    || rule.id === 'R_MINUS_02'
+    || ['R_PLUS_01', 'R_PLUS_02', 'R_PLUS_03', 'R_PLUS_04'].includes(rule.id)
+  ) return true;
   const content = rule.content.toLocaleLowerCase('vi-VN');
   return content.includes('không thuộc bài')
     || content.includes('không chuẩn bị bài')
-    || content.includes('thiếu bài tập');
+    || content.includes('thiếu bài tập')
+    || /^đạt điểm\s*(7|8|9|10)\b/.test(content);
 };
 
 interface PointEntryModuleProps {

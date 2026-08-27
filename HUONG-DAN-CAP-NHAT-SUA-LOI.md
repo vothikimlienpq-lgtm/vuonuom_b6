@@ -37,6 +37,8 @@
     - Nhận xét GVCN tự tạo theo điểm tích cực, lỗi học tập, lỗi nề nếp và kết quả rèn luyện thực tế của từng học sinh.
 22. Ba mục **Vi phạm rèn luyện**, **Theo dõi học tập** và **Rèn luyện cá nhân** có bộ chọn tháng ngay trong màn hình để xem lại dữ liệu các tháng trước.
 23. Mục **Theo dõi học tập** đã bỏ bộ lọc chọn môn; hệ thống luôn tổng hợp đầy đủ dữ liệu học tập của tất cả môn trong tháng đang xem.
+24. Danh mục quy chế điểm có nút **Sửa** tại từng dòng; GVCN có thể cập nhật nội dung, loại cộng/trừ, điểm mặc định, lĩnh vực và các yêu cầu nhập liệu. Hệ thống giữ nguyên mã quy định để cập nhật đúng bản ghi, không tạo bản sao và không làm mất các quy định khác.
+25. Bốn quy định **Đạt điểm 7, 8, 9, 10** dùng ô tự nhập tên môn học; danh sách hình thức kiểm tra vẫn được giữ nguyên.
 
 ## Cách kiểm tra trên máy
 
@@ -69,6 +71,8 @@ Sau đó mở địa chỉ Vite hiển thị trong Terminal và kiểm tra lần
 - Mở phiếu in, chọn một tuần bất kỳ và kiểm tra khoảng ngày của tuần; tiếp tục chọn Tháng, Học kỳ và Cả năm để kiểm tra bảng tổng hợp rút gọn vừa một mặt A4.
 - Kiểm tra phần nhận xét GVCN thay đổi phù hợp giữa học sinh không vi phạm, học sinh thiếu bài và học sinh có lỗi nề nếp.
 - Đổi tháng ngay tại Vi phạm rèn luyện, Theo dõi học tập và Rèn luyện cá nhân; kiểm tra tiêu đề và số liệu cùng đổi theo tháng.
+- Vào Cài đặt → Danh mục quy chế điểm, bấm biểu tượng bút chì tại một quy định, sửa số điểm rồi lưu; tải lại trang và xác nhận điểm mới vẫn còn, các quy định khác không bị mất.
+- Trong Nhập điểm tuần, chọn lần lượt Đạt điểm 7, 8, 9, 10 và xác nhận ô Môn học cho phép tự gõ tên môn.
 
 ## Đưa lên GitHub Pages
 
