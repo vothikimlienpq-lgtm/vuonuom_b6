@@ -387,7 +387,7 @@ export const IndividualConductModule: React.FC<IndividualConductModuleProps> = (
             <span>Kênh liên lạc & Trao đổi chính thức với Giáo viên chủ nhiệm:</span>
           </div>
           <p className="text-xs text-slate-600 leading-relaxed">
-            Để đảm bảo thông tin liên lạc kịp thời và bảo mật, Quý phụ huynh cần xin phép vắng hoặc trao đổi tình hình học tập xin vui lòng liên hệ trực tiếp với GVCN Cô Võ Thị Kim Liên qua số điện thoại/Zalo cá nhân hoặc sổ liên lạc điện tử của nhà trường.
+            Để đảm bảo thông tin liên lạc kịp thời và bảo mật, khi cần xin phép vắng hoặc trao đổi tình hình học tập, Quý phụ huynh vui lòng liên hệ trực tiếp với GVCN qua số điện thoại/Zalo cá nhân hoặc sổ liên lạc điện tử của nhà trường.
           </p>
         </div>
 
