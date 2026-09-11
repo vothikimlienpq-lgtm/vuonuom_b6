@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { ClassroomLayout, FullClassData, TeacherDeskSide, UserRole } from '../../types';
 import { api } from '../../services/api';
+import { rawFirebaseConfig } from '../../firebase/config';
 import { useToast } from '../Toast';
 import { moveOrSwapSeatAssignment } from '../../utils/classroomLayoutUtils';
 
@@ -208,7 +209,7 @@ export const ClassroomLayoutModule: React.FC<ClassroomLayoutModuleProps> = ({
     } catch (err: any) {
       const message = String(err?.message || '');
       error(message.includes('Missing or insufficient permissions')
-        ? 'Firebase chưa cấp quyền lưu Sơ đồ lớp. Hãy triển khai firestore.rules vào đúng dự án vuon-uom-lop-hoc rồi đăng nhập lại GVCN.'
+        ? `Firebase chưa cấp quyền lưu Sơ đồ lớp. Hãy triển khai firestore.rules vào đúng dự án ${rawFirebaseConfig.projectId || 'đang kết nối'} rồi đăng nhập lại GVCN.`
         : message || 'Không thể lưu sơ đồ lớp.');
     } finally {
       setIsSaving(false);

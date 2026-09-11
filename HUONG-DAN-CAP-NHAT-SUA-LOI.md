@@ -117,7 +117,14 @@ Không cần xóa dữ liệu điểm cũ trên Firestore. Bản sửa đã tư�
 
 ## 33. Lưu và đổi chỗ trong sơ đồ lớp
 
-- Tệp `.firebaserc` đã gắn dự án mặc định là `vuon-uom-lop-hoc`, giúp lệnh triển khai Rules không còn báo “No currently active project”.
+- Tệp `.firebaserc` đã gắn dự án mặc định là `vuon-uom-da-lop-test`, đúng với Firebase Project ID của website đang triển khai.
 - Sau khi cập nhật mã nguồn, chạy `firebase deploy --only firestore:rules` một lần để Firebase cho phép GVCN lưu sơ đồ.
 - Nút Lưu chỉ ghi một tài liệu `classes/{classId}/classroomLayouts/main`; không sửa hoặc xóa danh sách học sinh.
 - Nếu Firebase chưa nhận Rules mới, giao diện hiển thị hướng dẫn tiếng Việt thay cho thông báo quyền truy cập bằng tiếng Anh.
+
+## 34. Sửa và xóa riêng điểm thưởng tổ
+
+- Trong **Thi đua theo tổ → Trao điểm thưởng tổ**, GVCN xem được danh sách toàn bộ điểm thưởng của tháng đang chọn.
+- Mỗi điểm thưởng ghi rõ tổ, tuần, số điểm và lý do; có nút **Sửa** và **Xóa** riêng.
+- Nút **Xóa** chỉ xóa đúng điểm thưởng của tổ và tuần được chọn, không ảnh hưởng các tổ hoặc tuần khác.
+- Hệ thống yêu cầu xác nhận trước khi xóa và tự cập nhật lại Tổng quan tháng, bảng thi đua và thứ hạng sau khi xóa.

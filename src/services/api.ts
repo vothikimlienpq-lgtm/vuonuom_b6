@@ -1738,6 +1738,24 @@ export const api = {
     return api.updateGroupBonus(payload);
   },
 
+  deleteGroupBonus: async (payload: {
+    month: number;
+    week: number;
+    groupNumber: number;
+  }): Promise<{ success: boolean; message: string }> => {
+    try {
+      const bonusId = `M${payload.month}_W${payload.week}_G${payload.groupNumber}`;
+      await deleteDoc(doc(groupBonusesColRef, bonusId));
+      latestFullData.groupBonuses = latestFullData.groupBonuses.filter((bonus) => bonus.id !== bonusId);
+      return {
+        success: true,
+        message: `Đã xóa điểm thưởng Tổ ${payload.groupNumber} - Tuần ${payload.week}.`,
+      };
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `groupBonuses/${payload.groupNumber}`);
+    }
+  },
+
   // -------------------------------------------------------------
   // TIMETABLE & HOMEWORK
   // -------------------------------------------------------------

@@ -10,9 +10,11 @@ import {
   ChevronUp, 
   Lock,
   Gift,
-  Calendar
+  Calendar,
+  Pencil,
+  Trash2
 } from 'lucide-react';
-import { FullClassData, UserRole } from '../../types';
+import { FullClassData, GroupBonus, UserRole } from '../../types';
 import { computeGroupStandings, computeStudentScores, formatAveragePoints, formatSignedPoints, getConfiguredGroupCount, getConfiguredGroupNumbers } from '../../utils/calculations';
 import { api } from '../../services/api';
 import { useToast } from '../Toast';
@@ -44,12 +46,16 @@ export const GroupCompetitionModule: React.FC<GroupCompetitionModuleProps> = ({
   const [bonusReason, setBonusReason] = useState<string>('Trực nhật sạch sẽ & chuyên cần');
   const [bonusWeek, setBonusWeek] = useState<number>(selectedWeek);
   const [savingBonus, setSavingBonus] = useState(false);
+  const [deletingBonusId, setDeletingBonusId] = useState<string | null>(null);
 
   const students = data.students || [];
   const transactions = data.transactions || [];
   const groupBonuses = data.groupBonuses || [];
   const groupCount = getConfiguredGroupCount(data.config);
   const groupNumbers = getConfiguredGroupNumbers(data.config);
+  const selectedMonthBonuses = groupBonuses
+    .filter((bonus) => Number(bonus.month) === selectedMonth)
+    .sort((a, b) => Number(a.week) - Number(b.week) || Number(a.groupNumber) - Number(b.groupNumber));
 
   const standings = computeGroupStandings(students, transactions, groupBonuses, selectedMonth, data.config);
   const studentScores = computeStudentScores(students, transactions, selectedMonth, data.config);
@@ -81,6 +87,37 @@ export const GroupCompetitionModule: React.FC<GroupCompetitionModuleProps> = ({
       error(err.message || 'Lỗi khi lưu điểm thưởng');
     } finally {
       setSavingBonus(false);
+    }
+  };
+
+  const handleEditBonus = (bonus: GroupBonus) => {
+    setBonusGroupNum(Number(bonus.groupNumber));
+    setBonusWeek(Number(bonus.week));
+    setBonusPoints(Number(bonus.bonusPoints));
+    setBonusReason(bonus.reason || '');
+  };
+
+  const handleDeleteBonus = async (bonus: GroupBonus) => {
+    const confirmed = window.confirm(
+      `Xóa điểm thưởng +${bonus.bonusPoints}đ của Tổ ${bonus.groupNumber} - Tuần ${bonus.week}?\n\nChỉ điểm thưởng này bị xóa; các tổ và các tuần khác được giữ nguyên.`,
+    );
+    if (!confirmed) return;
+
+    setDeletingBonusId(bonus.id);
+    try {
+      const res = await api.deleteGroupBonus({
+        month: Number(bonus.month),
+        week: Number(bonus.week),
+        groupNumber: Number(bonus.groupNumber),
+      });
+      if (res.success) {
+        success(res.message);
+        onRefresh();
+      }
+    } catch (err: any) {
+      error(err.message || 'Không thể xóa điểm thưởng tổ.');
+    } finally {
+      setDeletingBonusId(null);
     }
   };
 
@@ -313,11 +350,65 @@ export const GroupCompetitionModule: React.FC<GroupCompetitionModuleProps> = ({
       {/* Bonus Modal for GVCN */}
       {showBonusModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-emerald-950/70 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white rounded-[28px] max-w-md w-full p-6 shadow-2xl border border-emerald-100">
+          <div className="bg-white rounded-[28px] max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl border border-emerald-100">
             <h3 className="text-lg font-black text-emerald-950 mb-4 flex items-center gap-2">
               <Gift className="w-5 h-5 text-amber-500" />
-              <span>Trao Điểm Thưởng Tập Thể Cho Tổ</span>
+              <span>Quản Lý Điểm Thưởng Tập Thể</span>
             </h3>
+
+            <div className="mb-5 rounded-2xl border border-emerald-100 bg-emerald-50/50 p-3">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className="text-xs font-black uppercase tracking-wide text-emerald-900">
+                  Điểm thưởng đã lưu trong Tháng {selectedMonth}
+                </span>
+                <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-slate-600">
+                  {selectedMonthBonuses.length} mục
+                </span>
+              </div>
+
+              {selectedMonthBonuses.length === 0 ? (
+                <p className="rounded-xl border border-dashed border-emerald-200 bg-white p-3 text-center text-xs text-slate-500">
+                  Tháng này chưa có điểm thưởng tổ.
+                </p>
+              ) : (
+                <div className="max-h-48 space-y-2 overflow-y-auto pr-1">
+                  {selectedMonthBonuses.map((bonus) => (
+                    <div
+                      key={bonus.id}
+                      className="flex flex-col gap-2 rounded-xl border border-emerald-100 bg-white p-3 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="min-w-0 text-xs">
+                        <div className="font-black text-emerald-950">
+                          Tổ {bonus.groupNumber} · Tuần {bonus.week} · +{bonus.bonusPoints}đ
+                        </div>
+                        <div className="mt-0.5 truncate text-slate-500" title={bonus.reason}>
+                          {bonus.reason || 'Không có lý do'}
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleEditBonus(bonus)}
+                          className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1.5 text-[11px] font-bold text-emerald-800 hover:bg-emerald-100"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                          Sửa
+                        </button>
+                        <button
+                          type="button"
+                          disabled={deletingBonusId === bonus.id}
+                          onClick={() => handleDeleteBonus(bonus)}
+                          className="inline-flex items-center gap-1 rounded-lg bg-rose-50 px-2.5 py-1.5 text-[11px] font-bold text-rose-700 hover:bg-rose-100 disabled:opacity-60"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          {deletingBonusId === bonus.id ? 'Đang xóa...' : 'Xóa'}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <form onSubmit={handleSaveBonus} className="space-y-4">
               <div>
