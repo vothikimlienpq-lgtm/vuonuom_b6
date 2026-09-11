@@ -14,6 +14,7 @@ import { HomeworkScheduleModule } from './components/modules/HomeworkScheduleMod
 import { CleaningDutyModule } from './components/modules/CleaningDutyModule';
 import { IndividualConductModule } from './components/modules/IndividualConductModule';
 import { ClassSettingsModule } from './components/modules/ClassSettingsModule';
+import { ClassroomLayoutModule } from './components/modules/ClassroomLayoutModule';
 import { FullClassData, UserSession } from './types';
 import { api } from './services/api';
 import { getCurrentWeekAndMonth, getWeekDateRange } from './utils/dateUtils';
@@ -228,13 +229,15 @@ function MainAppContent() {
         isSyncing={isSyncing}
       />
 
-      {/* Main Top Navigation */}
-      <Navigation
-        activeTab={activeTab}
-        onSelectTab={setActiveTab}
-        userRole={session?.role || 'guest'}
-      />
+      <div className="flex flex-1 items-start">
+        {/* Left desktop navigation; mobile keeps the compact bottom menu. */}
+        <Navigation
+          activeTab={activeTab}
+          onSelectTab={setActiveTab}
+          userRole={session?.role || 'guest'}
+        />
 
+        <div className="min-w-0 flex-1 flex flex-col min-h-[calc(100vh-73px)]">
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 pb-24 lg:pb-12">
         <>
@@ -325,6 +328,15 @@ function MainAppContent() {
               />
             )}
 
+            {activeTab === 'classroom_layout' && (
+              <ClassroomLayoutModule
+                data={data}
+                onRefresh={() => fetchData(true)}
+                userRole={session?.role || 'guest'}
+                userName={session?.username || 'Thành viên lớp'}
+              />
+            )}
+
             {activeTab === 'individual_conduct' && (
               <IndividualConductModule
                 data={data}
@@ -373,6 +385,8 @@ function MainAppContent() {
           </div>
         </div>
       </footer>
+        </div>
+      </div>
 
       {/* Modals */}
       <LoginModal

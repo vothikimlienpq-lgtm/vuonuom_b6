@@ -221,6 +221,23 @@ export interface CleaningAssignment {
   updatedAt: string;
 }
 
+export type TeacherDeskSide = 'left' | 'right';
+
+export interface ClassroomLayout {
+  id: 'main';
+  /** Số hàng bàn tính từ bảng lớp xuống cuối lớp. */
+  rows: number;
+  /** Số dãy bàn theo chiều ngang lớp học. */
+  columns: number;
+  /** Số chỗ ngồi trên mỗi bàn, hiện giao diện hỗ trợ 1-2 chỗ. */
+  seatsPerDesk: number;
+  teacherDeskSide: TeacherDeskSide;
+  /** Khóa là mã vị trí R{hàng}C{dãy}S{chỗ}, giá trị là ID học sinh. */
+  assignments: Record<string, string>;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
 export interface UserSession {
   role: UserRole;
   username: string;
@@ -256,6 +273,7 @@ export interface FullClassData {
   cleaningDuties: CleaningDutyEntry[];
   reminders: WeeklyReminder[];
   cleaningAssignments: CleaningAssignment[];
+  classroomLayout?: ClassroomLayout;
   currentSession?: UserSession;
 }
 

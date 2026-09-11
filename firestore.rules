@@ -77,6 +77,7 @@ service cloud.firestore {
       match /schoolRankings/{id} { allow read: if activeMember(classId) && !isParent(classId); allow write: if isTeacher(classId); }
       match /cleaningDuties/{id} { allow read: if activeMember(classId) && !isParent(classId); allow write: if isTeacher(classId) || isBCS(classId); }
       match /cleaningAssignments/{id} { allow read: if activeMember(classId) && !isParent(classId); allow write: if isTeacher(classId) || isBCS(classId); }
+      match /classroomLayouts/{id} { allow read: if activeMember(classId) && !isParent(classId); allow write: if isTeacher(classId); }
       match /reminders/{id} { allow read: if activeMember(classId) && !isParent(classId); allow write: if isTeacher(classId) || isBCS(classId); }
       match /auditLogs/{id} {
         allow read: if isTeacher(classId);

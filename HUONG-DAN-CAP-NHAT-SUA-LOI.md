@@ -87,3 +87,17 @@ Sau đó mở địa chỉ Vite hiển thị trong Terminal và kiểm tra lần
 Không chép tệp `.env.local` lên GitHub. Chỉ cập nhật các tệp mã nguồn trong gói này, commit và push lên nhánh `main`, sau đó chờ GitHub Actions build/deploy thành công.
 
 Không cần xóa dữ liệu điểm cũ trên Firestore. Bản sửa đã tương thích với các giao dịch điểm trừ trước đây.
+## 30. Bổ sung sơ đồ lớp có thể chỉnh sửa
+
+- Thêm mục **Sơ đồ lớp** vào menu chính.
+- GVCN được chọn số hàng, số dãy, một hoặc hai học sinh mỗi bàn.
+- GVCN được chọn bàn giáo viên ở bên trái hoặc bên phải lớp.
+- Có thể xếp nhanh theo số thứ tự, đổi từng vị trí, để trống chỗ và in sơ đồ.
+- Một học sinh không thể xuất hiện ở hai chỗ ngồi; dữ liệu được lưu riêng theo từng lớp.
+- Ban cán sự và thành viên chỉ xem; phụ huynh không nhận dữ liệu sơ đồ của cả lớp.
+
+## 31. Chuyển menu chức năng sang bên trái
+
+- Trên máy tính và laptop, menu chính được chuyển từ thanh ngang phía trên sang thanh dọc cố định bên trái.
+- Nội dung đang chọn được tô vàng, các mục luôn hiển thị theo chiều dọc để chuyển nhanh.
+- Trên điện thoại vẫn giữ menu đáy gọn để không làm hẹp vùng nội dung.

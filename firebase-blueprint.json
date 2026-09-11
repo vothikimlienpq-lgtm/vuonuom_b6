@@ -171,6 +171,10 @@
       "schema": "object",
       "description": "Phân công trực nhật chi tiết"
     },
+    "/classes/{classId}/classroomLayouts/{layoutId}": {
+      "schema": "object",
+      "description": "Sơ đồ chỗ ngồi của lớp; chỉ GVCN được chỉnh sửa"
+    },
     "/classes/{classId}/auditLogs/{logId}": {
       "schema": "object",
       "description": "Nhật ký hệ thống"

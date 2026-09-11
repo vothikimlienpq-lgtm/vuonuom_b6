@@ -9,7 +9,8 @@ import {
   CalendarDays, 
   Sparkle, 
   Users, 
-  Settings
+  Settings,
+  Map,
 } from 'lucide-react';
 import { UserRole } from '../types';
 
@@ -22,6 +23,7 @@ export type ModuleTab =
   | 'academic_monitoring' 
   | 'homework_schedule' 
   | 'cleaning_duty' 
+  | 'classroom_layout'
   | 'individual_conduct' 
   | 'class_settings';
 
@@ -41,6 +43,7 @@ export const NAV_ITEMS = [
   { id: 'academic_monitoring' as ModuleTab, label: 'Theo dõi học tập', icon: BookOpenCheck, shortLabel: 'Học tập' },
   { id: 'homework_schedule' as ModuleTab, label: 'Báo bài & TKB', icon: CalendarDays, shortLabel: 'Báo bài' },
   { id: 'cleaning_duty' as ModuleTab, label: 'Lịch trực nhật', icon: Sparkle, shortLabel: 'Trực nhật' },
+  { id: 'classroom_layout' as ModuleTab, label: 'Sơ đồ lớp', icon: Map, shortLabel: 'Sơ đồ lớp' },
   { id: 'individual_conduct' as ModuleTab, label: 'Rèn luyện cá nhân', icon: Users, shortLabel: 'Rèn luyện' },
   { id: 'class_settings' as ModuleTab, label: 'Cài đặt lớp', icon: Settings, shortLabel: 'Cài đặt', requiresGvcn: true },
 ];
@@ -57,16 +60,19 @@ export const Navigation: React.FC<NavigationProps> = ({
     return userRole !== 'guest';
   };
   const navItems = NAV_ITEMS.filter(item => canOpen(item.id));
-  const primaryMobile = [NAV_ITEMS[0], NAV_ITEMS[1], NAV_ITEMS[2], NAV_ITEMS[6], NAV_ITEMS[8]].filter(item => canOpen(item.id));
-  const secondaryMobile = [NAV_ITEMS[3], NAV_ITEMS[4], NAV_ITEMS[5], NAV_ITEMS[7], NAV_ITEMS[9]].filter(item => canOpen(item.id));
+  const primaryMobile = [NAV_ITEMS[0], NAV_ITEMS[1], NAV_ITEMS[2], NAV_ITEMS[6], NAV_ITEMS[9]].filter(item => canOpen(item.id));
+  const secondaryMobile = [NAV_ITEMS[3], NAV_ITEMS[4], NAV_ITEMS[5], NAV_ITEMS[7], NAV_ITEMS[8], NAV_ITEMS[10]].filter(item => canOpen(item.id));
 
   return (
     <>
-      {/* Desktop & Laptop Top Navigation Bar */}
-      <nav className="hidden lg:block bg-white border-b border-emerald-100 shadow-sm sticky top-[73px] z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="flex items-center justify-between py-2">
-            <div className="flex items-center gap-2 overflow-x-auto scrollbar-none">
+      {/* Desktop & Laptop Left Navigation Bar */}
+      <nav className="hidden lg:flex w-64 xl:w-72 shrink-0 bg-white border-r border-emerald-100 shadow-sm sticky top-[73px] h-[calc(100vh-73px)] z-30 flex-col no-print">
+        <div className="px-4 py-5 border-b border-emerald-100">
+          <div className="text-[11px] uppercase tracking-[0.18em] font-black text-emerald-700">Danh mục chức năng</div>
+          <div className="text-xs text-slate-500 mt-1">Chọn nhanh nội dung cần quản lý</div>
+        </div>
+        <div className="flex-1 overflow-y-auto px-3 py-3">
+          <div className="flex flex-col gap-1.5">
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.id;
@@ -74,20 +80,23 @@ export const Navigation: React.FC<NavigationProps> = ({
                   <button
                     key={item.id}
                     onClick={() => onSelectTab(item.id)}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all duration-200 cursor-pointer ${
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold text-left transition-all duration-200 cursor-pointer ${
                       isActive
-                        ? 'bg-amber-400 text-emerald-950 shadow-md scale-[1.02]'
+                        ? 'bg-amber-400 text-emerald-950 shadow-md translate-x-1'
                         : 'text-emerald-900/80 hover:text-emerald-950 hover:bg-emerald-50'
                     }`}
                   >
-                    <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-emerald-950 stroke-[2.5]' : 'text-emerald-700'}`} />
-                    <span>{item.label}</span>
+                    <span className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${isActive ? 'bg-white/50' : 'bg-emerald-50'}`}>
+                      <Icon className={`w-4.5 h-4.5 ${isActive ? 'text-emerald-950 stroke-[2.5]' : 'text-emerald-700'}`} />
+                    </span>
+                    <span className="leading-tight">{item.label}</span>
                   </button>
                 );
               })}
-            </div>
-
           </div>
+        </div>
+        <div className="px-4 py-4 border-t border-emerald-100 bg-emerald-50/60 text-[11px] text-emerald-800 font-semibold">
+          Menu được giữ cố định để chuyển mục nhanh hơn.
         </div>
       </nav>
 

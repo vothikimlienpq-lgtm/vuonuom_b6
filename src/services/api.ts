@@ -41,6 +41,7 @@ import {
   TimetableEntry,
   WeeklyReminder,
   CleaningAssignment,
+  ClassroomLayout,
   Student,
   PublicStudent,
   PrivateStudentData,
@@ -74,6 +75,7 @@ let homeworkColRef = collection(db, 'classes', activeClassId, 'homeworkTasks');
 let cleaningDutiesColRef = collection(db, 'classes', activeClassId, 'cleaningDuties');
 let remindersColRef = collection(db, 'classes', activeClassId, 'reminders');
 let cleaningAssignmentsColRef = collection(db, 'classes', activeClassId, 'cleaningAssignments');
+let classroomLayoutDocRef = doc(db, 'classes', activeClassId, 'classroomLayouts', 'main');
 let auditLogsColRef = collection(db, 'classes', activeClassId, 'auditLogs');
 let membersColRef = collection(db, 'classes', activeClassId, 'members');
 let parentViewLinksColRef = collection(db, 'classes', activeClassId, 'parentViewLinks');
@@ -102,6 +104,7 @@ const selectClass = (classId: string) => {
   cleaningDutiesColRef = collection(db, 'classes', activeClassId, 'cleaningDuties');
   remindersColRef = collection(db, 'classes', activeClassId, 'reminders');
   cleaningAssignmentsColRef = collection(db, 'classes', activeClassId, 'cleaningAssignments');
+  classroomLayoutDocRef = doc(db, 'classes', activeClassId, 'classroomLayouts', 'main');
   auditLogsColRef = collection(db, 'classes', activeClassId, 'auditLogs');
   membersColRef = collection(db, 'classes', activeClassId, 'members');
   parentViewLinksColRef = collection(db, 'classes', activeClassId, 'parentViewLinks');
@@ -179,6 +182,7 @@ const fullDataFromParentView = (view: ParentViewDocument): FullClassData => ({
   cleaningDuties: [],
   reminders: [],
   cleaningAssignments: [],
+  classroomLayout: undefined,
 });
 
 const sessionFromParentView = (view: ParentViewDocument): UserSession => ({
@@ -892,6 +896,19 @@ export const api = {
       );
       activeUnsubscribes.push(unsubAssignments);
 
+      // 14. Classroom seating layout (kept out of public parent views)
+      const unsubClassroomLayout = onSnapshot(
+        classroomLayoutDocRef,
+        (snap) => {
+          contextData.classroomLayout = snap.exists()
+            ? ({ id: 'main', ...snap.data() } as ClassroomLayout)
+            : undefined;
+          notifyUpdate();
+        },
+        (err) => console.warn('ClassroomLayout snapshot error:', err)
+      );
+      activeUnsubscribes.push(unsubClassroomLayout);
+
     } catch (error) {
       console.error('Subscription error:', error);
     }
@@ -959,6 +976,54 @@ export const api = {
 
   updateConfig: async (config: Partial<ClassConfig>): Promise<{ success: boolean; message: string }> => {
     return api.updateClassConfig(config);
+  },
+
+  saveClassroomLayout: async (
+    layout: Omit<ClassroomLayout, 'id' | 'updatedAt' | 'updatedBy'>
+  ): Promise<{ success: boolean; message: string }> => {
+    try {
+      const rows = Math.min(8, Math.max(1, Math.floor(Number(layout.rows) || 5)));
+      const columns = Math.min(6, Math.max(1, Math.floor(Number(layout.columns) || 4)));
+      const seatsPerDesk = Math.min(2, Math.max(1, Math.floor(Number(layout.seatsPerDesk) || 2)));
+      const teacherDeskSide = layout.teacherDeskSide === 'right' ? 'right' : 'left';
+      const validStudentIds = new Set(latestFullData.students.map((student) => student.id));
+      const validSeatIds = new Set<string>();
+      for (let row = 1; row <= rows; row += 1) {
+        for (let column = 1; column <= columns; column += 1) {
+          for (let seat = 1; seat <= seatsPerDesk; seat += 1) {
+            validSeatIds.add(`R${row}C${column}S${seat}`);
+          }
+        }
+      }
+      const assignments: Record<string, string> = {};
+      const assignedStudents = new Set<string>();
+      Object.entries(layout.assignments || {}).forEach(([seatId, studentId]) => {
+        if (
+          validSeatIds.has(seatId)
+          && validStudentIds.has(studentId)
+          && !assignedStudents.has(studentId)
+        ) {
+          assignments[seatId] = studentId;
+          assignedStudents.add(studentId);
+        }
+      });
+      const currentSession = await api.getCurrentSession();
+      const savedLayout: ClassroomLayout = {
+        id: 'main',
+        rows,
+        columns,
+        seatsPerDesk,
+        teacherDeskSide,
+        assignments,
+        updatedAt: new Date().toISOString(),
+        updatedBy: currentSession.username,
+      };
+      await setDoc(classroomLayoutDocRef, savedLayout);
+      latestFullData.classroomLayout = savedLayout;
+      return { success: true, message: 'Đã lưu sơ đồ lớp thành công!' };
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `classes/${activeClassId}/classroomLayouts/main`);
+    }
   },
 
   // -------------------------------------------------------------
