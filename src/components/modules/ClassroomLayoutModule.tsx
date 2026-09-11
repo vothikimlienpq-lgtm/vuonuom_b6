@@ -8,7 +8,6 @@ import {
   Maximize2,
   Minimize2,
   Printer,
-  RotateCcw,
   Save,
   Shuffle,
   X,
@@ -16,6 +15,7 @@ import {
 import { ClassroomLayout, FullClassData, TeacherDeskSide, UserRole } from '../../types';
 import { api } from '../../services/api';
 import { useToast } from '../Toast';
+import { moveOrSwapSeatAssignment } from '../../utils/classroomLayoutUtils';
 
 interface ClassroomLayoutModuleProps {
   data: FullClassData;
@@ -146,15 +146,7 @@ export const ClassroomLayoutModule: React.FC<ClassroomLayoutModuleProps> = ({
 
   const handleSeatChange = (positionId: string, studentId: string) => {
     setLayout((current) => {
-      const assignments = { ...current.assignments };
-      if (studentId) {
-        Object.keys(assignments).forEach((key) => {
-          if (assignments[key] === studentId) delete assignments[key];
-        });
-        assignments[positionId] = studentId;
-      } else {
-        delete assignments[positionId];
-      }
+      const assignments = moveOrSwapSeatAssignment(current.assignments, positionId, studentId);
       return { ...current, assignments };
     });
     setIsDirty(true);
@@ -188,11 +180,6 @@ export const ClassroomLayoutModule: React.FC<ClassroomLayoutModuleProps> = ({
     success('Đã xếp học sinh theo số thứ tự. Hãy kiểm tra và bấm Lưu.');
   };
 
-  const handleClear = () => {
-    if (!window.confirm('Xóa toàn bộ vị trí học sinh đang xếp? Danh sách lớp vẫn được giữ nguyên.')) return;
-    updateLayout({ assignments: {} });
-  };
-
   const handleCancel = () => {
     setLayout(normalizeLayout(data.classroomLayout, configuredGroupCount));
     setIsDirty(false);
@@ -219,7 +206,10 @@ export const ClassroomLayoutModule: React.FC<ClassroomLayoutModuleProps> = ({
         onRefresh();
       }
     } catch (err: any) {
-      error(err.message || 'Không thể lưu sơ đồ lớp.');
+      const message = String(err?.message || '');
+      error(message.includes('Missing or insufficient permissions')
+        ? 'Firebase chưa cấp quyền lưu Sơ đồ lớp. Hãy triển khai firestore.rules vào đúng dự án vuon-uom-lop-hoc rồi đăng nhập lại GVCN.'
+        : message || 'Không thể lưu sơ đồ lớp.');
     } finally {
       setIsSaving(false);
     }
@@ -304,7 +294,9 @@ export const ClassroomLayoutModule: React.FC<ClassroomLayoutModuleProps> = ({
               </select>
             </label>
             <button type="button" onClick={handleAutoArrange} className="h-8 px-2.5 rounded-lg bg-emerald-50 text-emerald-800 text-[10px] font-black inline-flex items-center gap-1 cursor-pointer"><Shuffle className="w-3.5 h-3.5" /> Xếp theo STT</button>
-            <button type="button" onClick={handleClear} className="h-8 px-2.5 rounded-lg bg-rose-50 text-rose-700 text-[10px] font-black inline-flex items-center gap-1 cursor-pointer"><RotateCcw className="w-3.5 h-3.5" /> Xóa vị trí</button>
+            <span className="hidden xl:inline-flex h-8 items-center px-2.5 rounded-lg bg-sky-50 text-sky-800 text-[10px] font-bold border border-sky-100">
+              Chọn “—” để xóa một chỗ · Chọn HS khác để chuyển/hoán đổi
+            </span>
             <button type="button" onClick={handleCancel} className="h-8 px-2.5 rounded-lg border border-slate-200 text-slate-700 text-[10px] font-black inline-flex items-center gap-1 cursor-pointer"><X className="w-3.5 h-3.5" /> Hủy</button>
             <button type="button" onClick={handleSave} disabled={isSaving} className="h-8 px-3 rounded-lg bg-amber-400 text-emerald-950 text-[10px] font-black inline-flex items-center gap-1 cursor-pointer disabled:opacity-50"><Save className="w-3.5 h-3.5" /> {isSaving ? 'Đang lưu' : 'Lưu'}</button>
           </>
@@ -365,19 +357,33 @@ export const ClassroomLayoutModule: React.FC<ClassroomLayoutModuleProps> = ({
                         return (
                           <div key={positionId} className="min-w-0 min-h-0 border-r last:border-r-0 border-emerald-200 flex items-center justify-center p-0.5 text-center">
                             {isEditing && canEdit ? (
-                              <select
-                                value={assignedId}
-                                onChange={(event) => handleSeatChange(positionId, event.target.value)}
-                                className="w-full h-full min-h-7 bg-transparent border-0 px-0.5 text-[10px] font-bold text-slate-800 text-center outline-none cursor-pointer"
-                                aria-label={`Tổ ${group}, bàn ${desk}, chỗ ${seat}`}
-                              >
-                                <option value="">—</option>
-                                {students.map((item) => (
-                                  <option key={item.id} value={item.id} disabled={assignedStudentIds.has(item.id) && item.id !== assignedId}>
-                                    {item.orderNumber}. {item.fullName}
-                                  </option>
-                                ))}
-                              </select>
+                              <div className="w-full h-full min-h-7 flex items-center gap-0.5">
+                                <select
+                                  value={assignedId}
+                                  onChange={(event) => handleSeatChange(positionId, event.target.value)}
+                                  className="min-w-0 flex-1 h-full bg-transparent border-0 px-0.5 text-[10px] font-bold text-slate-800 text-center outline-none cursor-pointer"
+                                  aria-label={`Tổ ${group}, bàn ${desk}, chỗ ${seat}`}
+                                  title="Chọn học sinh khác để chuyển hoặc hoán đổi vị trí"
+                                >
+                                  <option value="">—</option>
+                                  {students.map((item) => (
+                                    <option key={item.id} value={item.id}>
+                                      {item.orderNumber}. {item.fullName}
+                                    </option>
+                                  ))}
+                                </select>
+                                {assignedId && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSeatChange(positionId, '')}
+                                    className="no-print shrink-0 w-5 h-5 rounded-md bg-rose-50 text-rose-600 hover:bg-rose-100 inline-flex items-center justify-center cursor-pointer"
+                                    aria-label={`Xóa ${student?.fullName || 'học sinh'} khỏi vị trí này`}
+                                    title="Chỉ xóa học sinh khỏi vị trí này"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                )}
+                              </div>
                             ) : student ? (
                               <div className="leading-tight">
                                 <div className="text-[10px] sm:text-[11px] font-black text-slate-900">{student.fullName}</div>

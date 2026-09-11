@@ -98,6 +98,8 @@ Không cần xóa dữ liệu điểm cũ trên Firestore. Bản sửa đã tư�
 - Bố cục được nén vừa vùng màn hình và có nút toàn màn hình để xem rõ mà không phải cuộn xuống.
 - Một học sinh không thể xuất hiện ở hai chỗ ngồi; dữ liệu được lưu riêng theo từng lớp.
 - Ban cán sự và thành viên chỉ xem; phụ huynh không nhận dữ liệu sơ đồ của cả lớp.
+- Đã bỏ nút xóa toàn bộ sơ đồ. Dấu **×** chỉ xóa học sinh tại đúng vị trí đang chọn; chọn dấu **—** cũng chỉ làm trống một vị trí.
+- Có thể chọn một học sinh đang ngồi ở chỗ khác để chuyển sang chỗ trống hoặc tự động hoán đổi hai học sinh; không tạo học sinh trùng vị trí.
 
 ## 31. Chuyển menu chức năng sang bên trái
 
@@ -112,3 +114,10 @@ Không cần xóa dữ liệu điểm cũ trên Firestore. Bản sửa đã tư�
 - Khi dùng 6 tổ, bảng thi đua có đủ Tổ 1–6; bục vinh quang giữ ba hạng đầu và trình bày gọn hạng 4–6.
 - Không cho chuyển từ 6 về 4 tổ nếu vẫn còn học sinh thuộc Tổ 5 hoặc Tổ 6, nhờ đó không làm sai hay mất phân nhóm hiện có.
 - Dữ liệu lớp cũ chưa có trường `groupCount` tiếp tục hoạt động theo mặc định 4 tổ.
+
+## 33. Lưu và đổi chỗ trong sơ đồ lớp
+
+- Tệp `.firebaserc` đã gắn dự án mặc định là `vuon-uom-lop-hoc`, giúp lệnh triển khai Rules không còn báo “No currently active project”.
+- Sau khi cập nhật mã nguồn, chạy `firebase deploy --only firestore:rules` một lần để Firebase cho phép GVCN lưu sơ đồ.
+- Nút Lưu chỉ ghi một tài liệu `classes/{classId}/classroomLayouts/main`; không sửa hoặc xóa danh sách học sinh.
+- Nếu Firebase chưa nhận Rules mới, giao diện hiển thị hướng dẫn tiếng Việt thay cho thông báo quyền truy cập bằng tiếng Anh.
