@@ -13,7 +13,7 @@ import {
   Calendar
 } from 'lucide-react';
 import { FullClassData, UserRole } from '../../types';
-import { computeGroupStandings, computeStudentScores, formatAveragePoints, formatSignedPoints } from '../../utils/calculations';
+import { computeGroupStandings, computeStudentScores, formatAveragePoints, formatSignedPoints, getConfiguredGroupCount, getConfiguredGroupNumbers } from '../../utils/calculations';
 import { api } from '../../services/api';
 import { useToast } from '../Toast';
 
@@ -48,12 +48,18 @@ export const GroupCompetitionModule: React.FC<GroupCompetitionModuleProps> = ({
   const students = data.students || [];
   const transactions = data.transactions || [];
   const groupBonuses = data.groupBonuses || [];
+  const groupCount = getConfiguredGroupCount(data.config);
+  const groupNumbers = getConfiguredGroupNumbers(data.config);
 
   const standings = computeGroupStandings(students, transactions, groupBonuses, selectedMonth, data.config);
   const studentScores = computeStudentScores(students, transactions, selectedMonth, data.config);
   const monthWeekNumbers = studentScores[0]?.monthWeekNumbers || [];
 
   const isGvcn = userRole === 'gvcn';
+
+  React.useEffect(() => {
+    if (!groupNumbers.includes(bonusGroupNum)) setBonusGroupNum(1);
+  }, [bonusGroupNum, groupCount]);
 
   const handleSaveBonus = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,11 +84,11 @@ export const GroupCompetitionModule: React.FC<GroupCompetitionModuleProps> = ({
     }
   };
 
-  // Podium sorting: 2nd place on left, 1st in center (tallest), 3rd on right, 4th below
+  // Podium sorting: top 3 on the podium; remaining configured groups below.
   const rank1 = standings.find(s => s.rank === 1);
   const rank2 = standings.find(s => s.rank === 2);
   const rank3 = standings.find(s => s.rank === 3);
-  const rank4 = standings.find(s => s.rank === 4);
+  const remainingRanks = standings.filter((standing) => standing.rank >= 4).sort((a, b) => a.rank - b.rank);
 
   return (
     <div className="space-y-6">
@@ -97,7 +103,7 @@ export const GroupCompetitionModule: React.FC<GroupCompetitionModuleProps> = ({
           </div>
           <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white flex items-center gap-2">
             <Trophy className="w-7 h-7 text-amber-400" />
-            <span>Bảng Vinh Danh Thi Đua 4 Tổ</span>
+            <span>Bảng Vinh Danh Thi Đua {groupCount} Tổ</span>
           </h2>
           <p className="text-emerald-100 text-xs sm:text-sm mt-1">
             Điểm xếp hạng = Trung bình điểm mỗi học sinh trong tổ + Điểm thưởng tập thể do GVCN trao tặng.
@@ -189,12 +195,15 @@ export const GroupCompetitionModule: React.FC<GroupCompetitionModuleProps> = ({
 
         </div>
 
-        {/* 4th Place Card */}
-        {rank4 && (
-          <div className="max-w-md mx-auto mt-4 p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-center flex items-center justify-between px-6">
-            <span className="text-xs font-bold text-slate-600">🏅 Hạng Tư (Cố lên):</span>
-            <span className="font-black text-sm text-emerald-950">{rank4.groupName}</span>
-            <span className="font-bold text-sm text-emerald-800">{formatAveragePoints(rank4.grandTotal)} điểm TB</span>
+        {remainingRanks.length > 0 && (
+          <div className={`max-w-3xl mx-auto mt-4 grid gap-2 ${remainingRanks.length === 1 ? 'grid-cols-1 max-w-md' : 'grid-cols-1 sm:grid-cols-3'}`}>
+            {remainingRanks.map((standing) => (
+              <div key={standing.groupNumber} className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-center flex items-center justify-between gap-3 px-4">
+                <span className="text-xs font-bold text-slate-600">🏅 Hạng {standing.rank}</span>
+                <span className="font-black text-sm text-emerald-950">{standing.groupName}</span>
+                <span className="font-bold text-sm text-emerald-800">{formatAveragePoints(standing.grandTotal)} điểm TB</span>
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -202,7 +211,7 @@ export const GroupCompetitionModule: React.FC<GroupCompetitionModuleProps> = ({
       {/* Comprehensive Breakdown Matrix Table */}
       <div className="bg-white rounded-[24px] p-6 shadow-sm border border-emerald-100">
         <h3 className="text-base sm:text-lg font-black text-emerald-950 mb-4">
-          Bảng Điểm Chi Tiết Từng Tuần Của 4 Tổ (Tháng {selectedMonth})
+          Bảng Điểm Chi Tiết Từng Tuần Của {groupCount} Tổ (Tháng {selectedMonth})
         </h3>
 
         <div className="overflow-x-auto rounded-2xl border border-slate-200">
@@ -318,10 +327,7 @@ export const GroupCompetitionModule: React.FC<GroupCompetitionModuleProps> = ({
                   onChange={(e) => setBonusGroupNum(Number(e.target.value))}
                   className="w-full p-2.5 rounded-xl border border-slate-300 font-bold text-xs bg-white"
                 >
-                  <option value={1}>Tổ 1</option>
-                  <option value={2}>Tổ 2</option>
-                  <option value={3}>Tổ 3</option>
-                  <option value={4}>Tổ 4</option>
+                  {groupNumbers.map((group) => <option key={group} value={group}>Tổ {group}</option>)}
                 </select>
               </div>
 

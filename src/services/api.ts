@@ -316,6 +316,7 @@ export const createInitialClassConfig = (
     semester1Weeks: 18,
     activeMonth: new Date().getMonth() + 1,
     activeWeek: 1,
+    groupCount: 4,
     periodsPerDay: 8,
     morningPeriods: 5,
     afternoonPeriods: 3,
@@ -964,7 +965,18 @@ export const api = {
 
   updateClassConfig: async (config: Partial<ClassConfig>): Promise<{ success: boolean; message: string }> => {
     try {
-      const safeConfig = { ...config, id: activeClassId, initialized: true };
+      const requestedGroupCount = config.groupCount === undefined
+        ? undefined
+        : (Number(config.groupCount) === 6 ? 6 : 4);
+      if (requestedGroupCount === 4 && latestFullData.students.some((student) => Number(student.groupNumber) > 4)) {
+        throw new Error('Chưa thể chuyển về 4 tổ vì vẫn còn học sinh ở Tổ 5 hoặc Tổ 6. Hãy chuyển các em về Tổ 1–4 trước.');
+      }
+      const safeConfig = {
+        ...config,
+        ...(requestedGroupCount ? { groupCount: requestedGroupCount as 4 | 6 } : {}),
+        id: activeClassId,
+        initialized: true,
+      };
       await setDoc(classDocRef, safeConfig, { merge: true });
       latestFullData.config = { ...latestFullData.config, ...safeConfig };
       await safelySyncAllParentViews();
@@ -982,16 +994,29 @@ export const api = {
     layout: Omit<ClassroomLayout, 'id' | 'updatedAt' | 'updatedBy'>
   ): Promise<{ success: boolean; message: string }> => {
     try {
-      const rows = Math.min(8, Math.max(1, Math.floor(Number(layout.rows) || 5)));
-      const columns = Math.min(6, Math.max(1, Math.floor(Number(layout.columns) || 4)));
-      const seatsPerDesk = Math.min(2, Math.max(1, Math.floor(Number(layout.seatsPerDesk) || 2)));
+      const layoutMode: 4 | 6 = Number(latestFullData.config.groupCount) === 6 ? 6 : 4;
+      const defaultOrder = layoutMode === 4 ? [4, 2, 3, 1] : [1, 2, 3, 4, 5, 6];
+      const requestedOrder = Array.isArray(layout.groupOrder) ? layout.groupOrder.map(Number) : [];
+      const groupOrder = requestedOrder
+        .filter((group, index) => Number.isInteger(group)
+          && group >= 1
+          && group <= layoutMode
+          && requestedOrder.indexOf(group) === index);
+      defaultOrder.forEach((group) => {
+        if (!groupOrder.includes(group)) groupOrder.push(group);
+      });
       const teacherDeskSide = layout.teacherDeskSide === 'right' ? 'right' : 'left';
+      const doorSide = layout.doorSide === 'left' ? 'left' : 'right';
+      const teacherDeskLabel = String(layout.teacherDeskLabel || 'BÀN GIÁO VIÊN').trim().slice(0, 50) || 'BÀN GIÁO VIÊN';
+      const doorLabel = String(layout.doorLabel || 'CỬA RA VÀO').trim().slice(0, 50) || 'CỬA RA VÀO';
+      const aisleLabel = String(layout.aisleLabel || 'LỐI ĐI GIỮA').trim().slice(0, 50) || 'LỐI ĐI GIỮA';
       const validStudentIds = new Set(latestFullData.students.map((student) => student.id));
       const validSeatIds = new Set<string>();
-      for (let row = 1; row <= rows; row += 1) {
-        for (let column = 1; column <= columns; column += 1) {
-          for (let seat = 1; seat <= seatsPerDesk; seat += 1) {
-            validSeatIds.add(`R${row}C${column}S${seat}`);
+      const desksPerGroup = layoutMode === 6 ? 2 : 3;
+      for (let group = 1; group <= layoutMode; group += 1) {
+        for (let desk = 1; desk <= desksPerGroup; desk += 1) {
+          for (let seat = 1; seat <= 4; seat += 1) {
+            validSeatIds.add(`G${group}D${desk}S${seat}`);
           }
         }
       }
@@ -1010,10 +1035,13 @@ export const api = {
       const currentSession = await api.getCurrentSession();
       const savedLayout: ClassroomLayout = {
         id: 'main',
-        rows,
-        columns,
-        seatsPerDesk,
+        layoutMode,
+        groupOrder: groupOrder.slice(0, layoutMode),
         teacherDeskSide,
+        doorSide,
+        teacherDeskLabel,
+        doorLabel,
+        aisleLabel,
         assignments,
         updatedAt: new Date().toISOString(),
         updatedBy: currentSession.username,
@@ -1122,6 +1150,7 @@ export const api = {
       const selectedRule = latestFullData.rules.find((rule) => rule.id === payload.ruleId);
       const safeStudentName = String(payload.studentName || selectedStudent?.fullName || '').trim();
       const safeGroupNumber = Number(payload.groupNumber ?? selectedStudent?.groupNumber);
+      const groupCount = Number(latestFullData.config.groupCount) === 6 ? 6 : 4;
       const safeRuleContent = String(payload.ruleContent || selectedRule?.content || '').trim();
       const safeType = payload.type || selectedRule?.type;
       const safePoints = Math.abs(Number(payload.points ?? selectedRule?.defaultPoints));
@@ -1129,7 +1158,7 @@ export const api = {
       if (!payload.studentId || !safeStudentName) {
         throw new Error('Không xác định được học sinh. Vui lòng chọn lại học sinh trước khi lưu điểm.');
       }
-      if (!Number.isFinite(safeGroupNumber)) {
+      if (!Number.isInteger(safeGroupNumber) || safeGroupNumber < 1 || safeGroupNumber > groupCount) {
         throw new Error('Không xác định được tổ của học sinh. Vui lòng kiểm tra lại danh sách lớp.');
       }
       if (!safeRuleContent || (safeType !== 'plus' && safeType !== 'minus') || !Number.isFinite(safePoints)) {
@@ -1282,6 +1311,11 @@ export const api = {
     notes?: string;
   }): Promise<{ success: boolean; student: Student; message: string }> => {
     try {
+      const groupCount = Number(latestFullData.config.groupCount) === 6 ? 6 : 4;
+      const requestedGroup = Number(studentData.groupNumber);
+      if (!Number.isInteger(requestedGroup) || requestedGroup < 1 || requestedGroup > groupCount) {
+        throw new Error(`Tổ phải nằm trong phạm vi từ 1 đến ${groupCount}.`);
+      }
       const studentId = `STU_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
       const currentStudents = latestFullData.students;
       const orderNumber = currentStudents.length > 0 ? Math.max(...currentStudents.map((s) => s.orderNumber || 0)) + 1 : 1;
@@ -1293,7 +1327,7 @@ export const api = {
         orderNumber,
         fullName: studentData.fullName.trim(),
         gender: studentData.gender,
-        groupNumber: studentData.groupNumber,
+        groupNumber: requestedGroup,
         position: studentData.position || 'Thành viên',
       };
 
@@ -1357,7 +1391,14 @@ export const api = {
       const publicUpdates: Partial<PublicStudent> = {};
       if (studentData.fullName !== undefined) publicUpdates.fullName = studentData.fullName.trim();
       if (studentData.gender !== undefined) publicUpdates.gender = studentData.gender;
-      if (studentData.groupNumber !== undefined) publicUpdates.groupNumber = Number(studentData.groupNumber);
+      if (studentData.groupNumber !== undefined) {
+        const groupCount = Number(latestFullData.config.groupCount) === 6 ? 6 : 4;
+        const requestedGroup = Number(studentData.groupNumber);
+        if (!Number.isInteger(requestedGroup) || requestedGroup < 1 || requestedGroup > groupCount) {
+          throw new Error(`Tổ phải nằm trong phạm vi từ 1 đến ${groupCount}.`);
+        }
+        publicUpdates.groupNumber = requestedGroup;
+      }
       if (studentData.position !== undefined) publicUpdates.position = studentData.position;
       if (studentData.orderNumber !== undefined) publicUpdates.orderNumber = Number(studentData.orderNumber);
 
@@ -1466,12 +1507,16 @@ export const api = {
       }> = [];
 
       if (typeof studentsInput === 'string') {
+        const groupCount = Number(latestFullData.config.groupCount) === 6 ? 6 : 4;
         const lines = studentsInput.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
         parsedList = lines.map((line, idx) => {
           const parts = line.split(/[\t,|;]/).map((p) => p.trim());
           const name = parts[0] || `Học sinh ${idx + 1}`;
           const gender = parts[1] === 'Nữ' || parts[1] === 'Nu' ? 'Nữ' : 'Nam';
-          const groupNum = parseInt(parts[2]) || (idx % 4) + 1;
+          const parsedGroup = parseInt(parts[2]);
+          const groupNum = Number.isInteger(parsedGroup) && parsedGroup >= 1 && parsedGroup <= groupCount
+            ? parsedGroup
+            : (idx % groupCount) + 1;
           const pos = parts[3] || 'Thành viên';
           const phone = parts[4] || '';
           const parentPhone = parts[5] || '';
@@ -1501,7 +1546,9 @@ export const api = {
           orderNumber: orderNum,
           fullName: s.fullName.trim(),
           gender: s.gender || 'Nam',
-          groupNumber: s.groupNumber || (idx % 4) + 1,
+          groupNumber: Number(s.groupNumber) >= 1 && Number(s.groupNumber) <= (Number(latestFullData.config.groupCount) === 6 ? 6 : 4)
+            ? Number(s.groupNumber)
+            : (idx % (Number(latestFullData.config.groupCount) === 6 ? 6 : 4)) + 1,
           position: s.position || 'Thành viên',
         };
 
@@ -1660,6 +1707,10 @@ export const api = {
     reason: string;
   }): Promise<{ success: boolean; message: string }> => {
     try {
+      const groupCount = Number(latestFullData.config.groupCount) === 6 ? 6 : 4;
+      if (!Number.isInteger(Number(payload.groupNumber)) || Number(payload.groupNumber) < 1 || Number(payload.groupNumber) > groupCount) {
+        throw new Error(`Chỉ có thể trao điểm cho Tổ 1 đến Tổ ${groupCount} theo Cài đặt lớp.`);
+      }
       const bonusId = `M${payload.month}_W${payload.week}_G${payload.groupNumber}`;
       const bonusData: GroupBonus = {
         id: bonusId,

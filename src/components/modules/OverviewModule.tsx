@@ -17,7 +17,7 @@ import {
   Sparkle
 } from 'lucide-react';
 import { FullClassData } from '../../types';
-import { computeStudentScores, computeGroupStandings, formatAveragePoints, formatSignedPoints } from '../../utils/calculations';
+import { computeStudentScores, computeGroupStandings, formatAveragePoints, formatSignedPoints, getConfiguredGroupCount } from '../../utils/calculations';
 import { ModuleTab } from '../Navigation';
 
 interface OverviewModuleProps {
@@ -39,6 +39,7 @@ export const OverviewModule: React.FC<OverviewModuleProps> = ({
   const transactions = data.transactions || [];
   const groupBonuses = data.groupBonuses || [];
   const weekLocks = data.weekLocks || [];
+  const groupCount = getConfiguredGroupCount(data.config);
 
   const isWeekLocked = weekLocks.some(wl => wl.month === selectedMonth && wl.week === selectedWeek && wl.isLocked);
 
@@ -118,7 +119,7 @@ export const OverviewModule: React.FC<OverviewModuleProps> = ({
             <div className="text-2xl sm:text-3xl font-black text-white mt-2">
               {students.length} <span className="text-xs font-normal text-emerald-300">học sinh</span>
             </div>
-            <div className="text-[11px] text-emerald-200/80 mt-1">4 Tổ thi đua đồng đều</div>
+            <div className="text-[11px] text-emerald-200/80 mt-1">{groupCount} tổ thi đua theo cấu hình lớp</div>
           </div>
 
           <div className="bg-emerald-950/60 backdrop-blur-md rounded-2xl p-4 border border-emerald-700/40">
@@ -162,7 +163,7 @@ export const OverviewModule: React.FC<OverviewModuleProps> = ({
           <div className="flex items-center gap-2">
             <Trophy className="w-5 h-5 text-amber-500" />
             <h3 className="text-lg font-black text-emerald-950 tracking-tight">
-              Bảng Xếp Hạng Thi Đua 4 Tổ (Tháng {selectedMonth})
+              Bảng Xếp Hạng Thi Đua {groupCount} Tổ (Tháng {selectedMonth})
             </h3>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -190,7 +191,7 @@ export const OverviewModule: React.FC<OverviewModuleProps> = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 ${groupCount === 6 ? 'xl:grid-cols-3' : 'lg:grid-cols-4'}`}>
           {groupStandings.map((g) => {
             const rankStyles = [
               { label: 'Hạng 1', bg: 'bg-amber-50 border-amber-300 text-amber-950', badge: 'bg-amber-400 text-amber-950' },

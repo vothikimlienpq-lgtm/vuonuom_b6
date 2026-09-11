@@ -21,6 +21,7 @@ import { FullClassData, DayOfWeek, CleaningAssignment, UserRole } from '../../ty
 import { api } from '../../services/api';
 import { useToast } from '../Toast';
 import { getWeekDateRange } from '../../utils/dateUtils';
+import { getConfiguredGroupNumbers } from '../../utils/calculations';
 
 const DAYS_OF_WEEK: { key: DayOfWeek; label: string }[] = [
   { key: 'Thứ 2', label: 'Thứ Hai' },
@@ -538,13 +539,13 @@ export const CleaningDutyModule: React.FC<CleaningDutyModuleProps> = ({
 
             <form onSubmit={handleSaveSlot} className="flex-1 overflow-y-auto py-4 space-y-4 pr-1">
               
-              {/* Quick Group Selectors (Tổ 1, Tổ 2, Tổ 3, Tổ 4) */}
+              {/* Quick Group Selectors, synchronized with Class Settings. */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">
                   Chọn nhanh theo Tổ:
                 </label>
-                <div className="grid grid-cols-4 gap-2">
-                  {[1, 2, 3, 4].map(g => (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {getConfiguredGroupNumbers(data.config).map(g => (
                     <button
                       key={g}
                       type="button"

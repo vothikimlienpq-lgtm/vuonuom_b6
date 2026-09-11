@@ -30,7 +30,7 @@ import {
 import { api } from '../../services/api';
 import { useToast } from '../Toast';
 import { getWeekDateRange } from '../../utils/dateUtils';
-import { formatSignedPoints, getSignedTransactionPoints } from '../../utils/calculations';
+import { formatSignedPoints, getConfiguredGroupNumbers, getSignedTransactionPoints } from '../../utils/calculations';
 
 const DAYS_OF_WEEK: DayOfWeek[] = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
 
@@ -478,7 +478,7 @@ export const PointEntryModule: React.FC<PointEntryModuleProps> = ({
             >
               Tất cả tổ ({students.length})
             </button>
-            {[1, 2, 3, 4].map(g => (
+            {getConfiguredGroupNumbers(data.config).map(g => (
               <button
                 key={g}
                 onClick={() => setSelectedGroupFilter(g)}

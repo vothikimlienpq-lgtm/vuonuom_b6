@@ -239,7 +239,9 @@ function MainAppContent() {
 
         <div className="min-w-0 flex-1 flex flex-col min-h-[calc(100vh-73px)]">
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 pb-24 lg:pb-12">
+      <main className={activeTab === 'classroom_layout'
+        ? 'flex-1 w-full mx-auto px-2 sm:px-3 py-2 pb-24 lg:pb-2'
+        : 'flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 pb-24 lg:pb-12'}>
         <>
             {activeTab === 'overview' && (
               <OverviewModule

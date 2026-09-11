@@ -27,7 +27,7 @@ import {
 import { FullClassData, ClassConfig, PointRule, Student, UserRole } from '../../types';
 import { api } from '../../services/api';
 import { useToast } from '../Toast';
-import { normalizeConductThresholds } from '../../utils/calculations';
+import { getConfiguredGroupCount, getConfiguredGroupNumbers, normalizeConductThresholds } from '../../utils/calculations';
 
 interface ClassSettingsModuleProps {
   data: FullClassData;
@@ -62,6 +62,7 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
     week1StartDate: currentConfig.week1StartDate || '2026-08-03',
     totalWeeks: currentConfig.totalWeeks || 38,
     semester1Weeks: currentConfig.semester1Weeks || 18,
+    groupCount: getConfiguredGroupCount(currentConfig),
     periodsPerDay: currentConfig.periodsPerDay || 8,
     morningPeriods: currentConfig.morningPeriods || 5,
     afternoonPeriods: currentConfig.afternoonPeriods || 3,
@@ -77,13 +78,14 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
       province: data.config.province || '',
       totalWeeks: data.config.totalWeeks || 38,
       semester1Weeks: data.config.semester1Weeks || 18,
+      groupCount: getConfiguredGroupCount(data.config),
       periodsPerDay: data.config.periodsPerDay || 8,
       morningPeriods: data.config.morningPeriods || 5,
       afternoonPeriods: data.config.afternoonPeriods ?? 3,
       scheduleStructure: data.config.scheduleStructure || 'standard8',
       conductThresholds: data.config.conductThresholds,
     });
-  }, [data.config.id]);
+  }, [data.config]);
 
   // Security Form states
   const [gvcnPass, setGvcnPass] = useState('');
@@ -151,6 +153,12 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
   const [studentPhone, setStudentPhone] = useState('');
   const [studentParentPhone, setStudentParentPhone] = useState('');
 
+  useEffect(() => {
+    const groupCount = getConfiguredGroupCount(config);
+    if (newStudentGroup > groupCount) setNewStudentGroup(1);
+    if (studentGroup > groupCount) setStudentGroup(1);
+  }, [config.groupCount, newStudentGroup, studentGroup]);
+
   // Delete student confirmation modal
   const [deletingStudent, setDeletingStudent] = useState<Student | null>(null);
 
@@ -187,6 +195,11 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
       return;
     }
     const periodsPerDay = Number(config.periodsPerDay) || 8;
+    const groupCount = getConfiguredGroupCount(config);
+    if (groupCount === 4 && students.some((student) => Number(student.groupNumber) > 4)) {
+      warning('Chưa thể chuyển về 4 tổ vì vẫn còn học sinh ở Tổ 5 hoặc Tổ 6. Hãy chuyển các em về Tổ 1–4 trước.');
+      return;
+    }
     const morningPeriods = Math.min(
       periodsPerDay,
       Math.max(1, Number(config.morningPeriods) || Math.min(periodsPerDay, 5))
@@ -196,6 +209,7 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
       const res = await api.updateConfig({
         ...config,
         periodsPerDay,
+        groupCount,
         totalWeeks: Number(config.totalWeeks) || 38,
         semester1Weeks: Math.min(
           Math.max(1, Number(config.semester1Weeks) || 18),
@@ -653,6 +667,39 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
                     </p>
                   </div>
                 </div>
+              </div>
+
+              {/* Section 2: Study Time Planning */}
+              <div className="space-y-4 pt-2">
+                <div className="flex items-center justify-between gap-3 pb-2 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-5 h-5 text-emerald-800" />
+                    <h3 className="text-base font-black text-emerald-950">Cấu Hình Số Tổ Của Lớp</h3>
+                  </div>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-900">Đồng bộ toàn hệ thống</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {([4, 6] as const).map((count) => (
+                    <button
+                      key={count}
+                      type="button"
+                      onClick={() => setConfig({ ...config, groupCount: count })}
+                      className={`rounded-2xl border-2 p-4 text-left transition cursor-pointer ${
+                        getConfiguredGroupCount(config) === count
+                          ? 'border-emerald-700 bg-emerald-50 shadow-sm'
+                          : 'border-slate-200 bg-white hover:border-emerald-300'
+                      }`}
+                    >
+                      <div className="text-sm font-black text-emerald-950">{count} tổ thi đua</div>
+                      <div className="mt-1 text-[11px] leading-snug text-slate-600">
+                        {count === 4 ? 'Sơ đồ 2 × 2; mỗi tổ 3 bàn.' : 'Sơ đồ 2 × 3; mỗi tổ 2 bàn.'}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] leading-relaxed text-slate-500">
+                  Lựa chọn này tự áp dụng cho Sơ đồ lớp, phân tổ học sinh, Nhập điểm, Thi đua theo tổ, Trực nhật và các bảng tổng hợp. Khi chuyển từ 6 về 4 tổ, cần chuyển hết học sinh ở Tổ 5–6 về Tổ 1–4 trước.
+                </p>
               </div>
 
               {/* Section 2: Study Time Planning */}
@@ -1461,10 +1508,7 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
                     onChange={(e) => setNewStudentGroup(Number(e.target.value))}
                     className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold"
                   >
-                    <option value={1}>Tổ 1</option>
-                    <option value={2}>Tổ 2</option>
-                    <option value={3}>Tổ 3</option>
-                    <option value={4}>Tổ 4</option>
+                    {getConfiguredGroupNumbers(config).map((group) => <option key={group} value={group}>Tổ {group}</option>)}
                   </select>
                 </div>
               </div>
@@ -1569,10 +1613,7 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
                     onChange={(e) => setStudentGroup(Number(e.target.value))}
                     className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold"
                   >
-                    <option value={1}>Tổ 1</option>
-                    <option value={2}>Tổ 2</option>
-                    <option value={3}>Tổ 3</option>
-                    <option value={4}>Tổ 4</option>
+                    {getConfiguredGroupNumbers(config).map((group) => <option key={group} value={group}>Tổ {group}</option>)}
                   </select>
                 </div>
               </div>

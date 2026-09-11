@@ -27,6 +27,8 @@ export interface ClassConfig {
   semester1Weeks?: number; // Số tuần thuộc Học kỳ I; HKII nhận các tuần còn lại
   activeMonth: number;
   activeWeek: number;
+  /** Số tổ thi đua của lớp; là nguồn cấu hình chung cho toàn hệ thống. */
+  groupCount?: 4 | 6;
   periodsPerDay?: number; // 5, 8, 10, etc.
   morningPeriods?: number; // default 5
   afternoonPeriods?: number; // default 3
@@ -45,7 +47,7 @@ export interface PublicStudent {
   orderNumber: number;
   fullName: string;
   gender: 'Nam' | 'Nữ';
-  groupNumber: number; // 1, 2, 3, 4
+  groupNumber: number; // 1 đến số tổ được cấu hình cho lớp
   position: string;
 }
 
@@ -225,15 +227,21 @@ export type TeacherDeskSide = 'left' | 'right';
 
 export interface ClassroomLayout {
   id: 'main';
-  /** Số hàng bàn tính từ bảng lớp xuống cuối lớp. */
-  rows: number;
-  /** Số dãy bàn theo chiều ngang lớp học. */
-  columns: number;
-  /** Số chỗ ngồi trên mỗi bàn, hiện giao diện hỗ trợ 1-2 chỗ. */
-  seatsPerDesk: number;
+  /** Mẫu 4 tổ (3 bàn/tổ) hoặc 6 tổ (2 bàn/tổ). */
+  layoutMode: 4 | 6;
+  /** Thứ tự các tổ trên sơ đồ, đọc từ trái sang phải và từ trên xuống dưới. */
+  groupOrder: number[];
   teacherDeskSide: TeacherDeskSide;
-  /** Khóa là mã vị trí R{hàng}C{dãy}S{chỗ}, giá trị là ID học sinh. */
+  doorSide: TeacherDeskSide;
+  teacherDeskLabel: string;
+  doorLabel: string;
+  aisleLabel: string;
+  /** Khóa là G{tổ}D{bàn}S{chỗ}, giá trị là ID học sinh. */
   assignments: Record<string, string>;
+  /** Các trường cũ chỉ dùng để đọc và chuyển đổi sơ đồ phiên bản trước. */
+  rows?: number;
+  columns?: number;
+  seatsPerDesk?: number;
   updatedAt?: string;
   updatedBy?: string;
 }

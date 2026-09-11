@@ -60,14 +60,15 @@ export const Navigation: React.FC<NavigationProps> = ({
     return userRole !== 'guest';
   };
   const navItems = NAV_ITEMS.filter(item => canOpen(item.id));
+  const compactDesktop = activeTab === 'classroom_layout';
   const primaryMobile = [NAV_ITEMS[0], NAV_ITEMS[1], NAV_ITEMS[2], NAV_ITEMS[6], NAV_ITEMS[9]].filter(item => canOpen(item.id));
   const secondaryMobile = [NAV_ITEMS[3], NAV_ITEMS[4], NAV_ITEMS[5], NAV_ITEMS[7], NAV_ITEMS[8], NAV_ITEMS[10]].filter(item => canOpen(item.id));
 
   return (
     <>
       {/* Desktop & Laptop Left Navigation Bar */}
-      <nav className="hidden lg:flex w-64 xl:w-72 shrink-0 bg-white border-r border-emerald-100 shadow-sm sticky top-[73px] h-[calc(100vh-73px)] z-30 flex-col no-print">
-        <div className="px-4 py-5 border-b border-emerald-100">
+      <nav className={`hidden lg:flex shrink-0 bg-white border-r border-emerald-100 shadow-sm sticky top-[73px] h-[calc(100vh-73px)] z-30 flex-col no-print transition-[width] duration-200 ${compactDesktop ? 'w-20' : 'w-64 xl:w-72'}`}>
+        <div className={`px-4 py-5 border-b border-emerald-100 ${compactDesktop ? 'hidden' : ''}`}>
           <div className="text-[11px] uppercase tracking-[0.18em] font-black text-emerald-700">Danh mục chức năng</div>
           <div className="text-xs text-slate-500 mt-1">Chọn nhanh nội dung cần quản lý</div>
         </div>
@@ -80,22 +81,23 @@ export const Navigation: React.FC<NavigationProps> = ({
                   <button
                     key={item.id}
                     onClick={() => onSelectTab(item.id)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold text-left transition-all duration-200 cursor-pointer ${
+                    title={compactDesktop ? item.label : undefined}
+                    className={`w-full flex items-center rounded-2xl text-sm font-bold transition-all duration-200 cursor-pointer ${compactDesktop ? 'justify-center px-2 py-2.5' : 'gap-3 px-4 py-3 text-left'} ${
                       isActive
-                        ? 'bg-amber-400 text-emerald-950 shadow-md translate-x-1'
+                        ? `bg-amber-400 text-emerald-950 shadow-md ${compactDesktop ? '' : 'translate-x-1'}`
                         : 'text-emerald-900/80 hover:text-emerald-950 hover:bg-emerald-50'
                     }`}
                   >
                     <span className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${isActive ? 'bg-white/50' : 'bg-emerald-50'}`}>
                       <Icon className={`w-4.5 h-4.5 ${isActive ? 'text-emerald-950 stroke-[2.5]' : 'text-emerald-700'}`} />
                     </span>
-                    <span className="leading-tight">{item.label}</span>
+                    {!compactDesktop && <span className="leading-tight">{item.label}</span>}
                   </button>
                 );
               })}
           </div>
         </div>
-        <div className="px-4 py-4 border-t border-emerald-100 bg-emerald-50/60 text-[11px] text-emerald-800 font-semibold">
+        <div className={`px-4 py-4 border-t border-emerald-100 bg-emerald-50/60 text-[11px] text-emerald-800 font-semibold ${compactDesktop ? 'hidden' : ''}`}>
           Menu được giữ cố định để chuyển mục nhanh hơn.
         </div>
       </nav>

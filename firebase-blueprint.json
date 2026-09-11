@@ -19,6 +19,7 @@
         "semester1Weeks": { "type": "number" },
         "activeMonth": { "type": "number" },
         "activeWeek": { "type": "number" },
+        "groupCount": { "type": "number", "enum": [4, 6], "description": "Số tổ thi đua dùng chung trong toàn hệ thống" },
         "periodsPerDay": { "type": "number" },
         "morningPeriods": { "type": "number" },
         "afternoonPeriods": { "type": "number" },
@@ -173,7 +174,7 @@
     },
     "/classes/{classId}/classroomLayouts/{layoutId}": {
       "schema": "object",
-      "description": "Sơ đồ chỗ ngồi của lớp; chỉ GVCN được chỉnh sửa"
+      "description": "Sơ đồ chỗ ngồi 4 hoặc 6 tổ của lớp; chỉ GVCN được chỉnh sửa"
     },
     "/classes/{classId}/auditLogs/{logId}": {
       "schema": "object",

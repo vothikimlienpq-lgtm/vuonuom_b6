@@ -22,7 +22,7 @@
     - Quy định đã lưu trùng mã sẽ cập nhật đúng bản ghi tương ứng, không tạo bản sao.
     - Xóa quy định chuẩn không làm quy định đó tự xuất hiện lại sau khi tải trang.
     - Quy định tự thêm được nối sau danh sách chuẩn và vẫn xóa bình thường.
-12. Bảng xếp hạng thi đua 4 tổ được tính công bằng theo công thức **trung bình điểm mỗi học sinh + điểm thưởng tập thể**; tổ không có thành viên luôn xếp sau.
+12. Bảng xếp hạng thi đua tự dùng 4 hoặc 6 tổ theo **Cài đặt lớp**, tính công bằng theo công thức **trung bình điểm mỗi học sinh + điểm thưởng tập thể**; tổ không có thành viên luôn xếp sau.
 13. Bảng xếp hạng ở Tổng quan và Thi đua theo tổ có bộ chọn tháng để xem lại các tháng đã qua.
 14. Cài đặt lớp có thêm ô **Sở Giáo dục và Đào tạo chủ quản** và **Tỉnh/Thành phố**; phần đầu phiếu in lấy tên Sở, còn địa danh ký lấy đúng tỉnh/thành phố giáo viên đã nhập, không còn ghi cứng Hà Nội.
 15. Mục **Đổi mật khẩu** hỗ trợ cả GVCN, Ban cán sự và Thành viên lớp. Với tài khoản BCS/Thành viên, hệ thống yêu cầu mật khẩu hiện tại trước khi đổi và chỉ thao tác trên tài khoản đang hoạt động của đúng lớp.
@@ -90,9 +90,12 @@ Không cần xóa dữ liệu điểm cũ trên Firestore. Bản sửa đã tư�
 ## 30. Bổ sung sơ đồ lớp có thể chỉnh sửa
 
 - Thêm mục **Sơ đồ lớp** vào menu chính.
-- GVCN được chọn số hàng, số dãy, một hoặc hai học sinh mỗi bàn.
+- GVCN chọn **4 tổ hoặc 6 tổ** tại Cài đặt lớp; sơ đồ tự chuyển đúng mẫu chung của lớp.
+- Mẫu 4 tổ hiển thị 2 × 2, mỗi tổ 3 bàn; mẫu 6 tổ hiển thị 2 × 3, mỗi tổ 2 bàn. Mỗi bàn có 4 vị trí và tổng sức chứa của hai mẫu đều là 48 chỗ.
 - GVCN được chọn bàn giáo viên ở bên trái hoặc bên phải lớp.
-- Có thể xếp nhanh theo số thứ tự, đổi từng vị trí, để trống chỗ và in sơ đồ.
+- Có thể đổi thứ tự/vị trí tổ, sửa nhãn bàn giáo viên, cửa ra vào, lối đi, xếp nhanh theo số thứ tự, đổi từng vị trí và in sơ đồ.
+- Chỗ chưa có học sinh để trắng hoàn toàn khi xem và in; không hiện chữ “Trống”. Tên lớp lấy tự động từ Cài đặt lớp.
+- Bố cục được nén vừa vùng màn hình và có nút toàn màn hình để xem rõ mà không phải cuộn xuống.
 - Một học sinh không thể xuất hiện ở hai chỗ ngồi; dữ liệu được lưu riêng theo từng lớp.
 - Ban cán sự và thành viên chỉ xem; phụ huynh không nhận dữ liệu sơ đồ của cả lớp.
 
@@ -101,3 +104,11 @@ Không cần xóa dữ liệu điểm cũ trên Firestore. Bản sửa đã tư�
 - Trên máy tính và laptop, menu chính được chuyển từ thanh ngang phía trên sang thanh dọc cố định bên trái.
 - Nội dung đang chọn được tô vàng, các mục luôn hiển thị theo chiều dọc để chuyển nhanh.
 - Trên điện thoại vẫn giữ menu đáy gọn để không làm hẹp vùng nội dung.
+
+## 32. Đồng bộ cấu hình 4 hoặc 6 tổ
+
+- **Cài đặt lớp** là nguồn duy nhất chọn 4 tổ hoặc 6 tổ.
+- Cấu hình tự đồng bộ sang danh sách/phân tổ học sinh, Nhập điểm tuần, Tổng quan tháng, Thi đua theo tổ, Vi phạm rèn luyện, Theo dõi học tập, Rèn luyện cá nhân, Lịch trực nhật và Sơ đồ lớp.
+- Khi dùng 6 tổ, bảng thi đua có đủ Tổ 1–6; bục vinh quang giữ ba hạng đầu và trình bày gọn hạng 4–6.
+- Không cho chuyển từ 6 về 4 tổ nếu vẫn còn học sinh thuộc Tổ 5 hoặc Tổ 6, nhờ đó không làm sai hay mất phân nhóm hiện có.
+- Dữ liệu lớp cũ chưa có trường `groupCount` tiếp tục hoạt động theo mặc định 4 tổ.

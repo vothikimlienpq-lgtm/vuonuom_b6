@@ -15,7 +15,7 @@ import {
   Calendar
 } from 'lucide-react';
 import { FullClassData, Student, PointTransaction } from '../../types';
-import { computeStudentScores, formatSignedPoints, getSignedTransactionPoints } from '../../utils/calculations';
+import { computeStudentScores, formatSignedPoints, getConfiguredGroupNumbers, getSignedTransactionPoints } from '../../utils/calculations';
 
 interface DisciplineViolationsModuleProps {
   data: FullClassData;
@@ -165,7 +165,7 @@ export const DisciplineViolationsModule: React.FC<DisciplineViolationsModuleProp
             >
               Tất cả ({studentSummaries.length})
             </button>
-            {[1, 2, 3, 4].map(g => (
+            {getConfiguredGroupNumbers(data.config).map(g => (
               <button
                 key={g}
                 onClick={() => setSelectedGroup(g)}

@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { FullClassData, Student, UserRole, UserSession } from '../../types';
 import { ModuleTab } from '../Navigation';
-import { computeStudentScores, formatConductThresholds, formatSignedPoints, getSignedTransactionPoints, StudentScoreSummary } from '../../utils/calculations';
+import { computeStudentScores, formatConductThresholds, formatSignedPoints, getConfiguredGroupNumbers, getSignedTransactionPoints, StudentScoreSummary } from '../../utils/calculations';
 import { ParentReportPrintModal } from '../ParentReportPrintModal';
 import { useToast } from '../Toast';
 import { ConductYearSummary } from './ConductYearSummary';
@@ -499,7 +499,7 @@ export const IndividualConductModule: React.FC<IndividualConductModuleProps> = (
               >
                 Tất cả tổ ({students.length})
               </button>
-              {[1, 2, 3, 4].map(g => (
+              {getConfiguredGroupNumbers(data.config).map(g => (
                 <button
                   key={g}
                   onClick={() => setSelectedGroup(g)}

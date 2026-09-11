@@ -409,6 +409,14 @@ export function formatAveragePoints(value: number): string {
   return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1).replace('.', ',');
 }
 
+export function getConfiguredGroupCount(config?: ClassConfig): 4 | 6 {
+  return Number(config?.groupCount) === 6 ? 6 : 4;
+}
+
+export function getConfiguredGroupNumbers(config?: ClassConfig): number[] {
+  return Array.from({ length: getConfiguredGroupCount(config) }, (_, index) => index + 1);
+}
+
 export function computeGroupStandings(
   students: Student[] = [],
   transactions: PointTransaction[] = [],
@@ -422,7 +430,7 @@ export function computeGroupStandings(
     config ? getWeekNumbersForMonth(config.week1StartDate, Number(config.totalWeeks) || 38, activeMonth) : []
   );
 
-  const standings: GroupStanding[] = [1, 2, 3, 4].map(gNum => {
+  const standings: GroupStanding[] = getConfiguredGroupNumbers(config).map(gNum => {
     const groupStudents = summaries.filter(s => s.groupNumber === gNum);
     const bonuses = bonusesList.filter(b => Number(b.month) === Number(activeMonth) && b.groupNumber === gNum);
 

@@ -1,14 +1,16 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AlertCircle,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Edit3,
   LayoutGrid,
+  Maximize2,
+  Minimize2,
   Printer,
   RotateCcw,
   Save,
   Shuffle,
-  Users,
   X,
 } from 'lucide-react';
 import { ClassroomLayout, FullClassData, TeacherDeskSide, UserRole } from '../../types';
@@ -24,25 +26,70 @@ interface ClassroomLayoutModuleProps {
 
 const DEFAULT_LAYOUT: ClassroomLayout = {
   id: 'main',
-  rows: 5,
-  columns: 4,
-  seatsPerDesk: 2,
+  layoutMode: 4,
+  groupOrder: [4, 2, 3, 1],
   teacherDeskSide: 'left',
+  doorSide: 'right',
+  teacherDeskLabel: 'BÀN GIÁO VIÊN',
+  doorLabel: 'CỬA RA VÀO',
+  aisleLabel: 'LỐI ĐI GIỮA',
   assignments: {},
 };
 
-const seatId = (row: number, column: number, seat: number) => `R${row}C${column}S${seat}`;
+const seatId = (group: number, desk: number, seat: number) => `G${group}D${desk}S${seat}`;
 
-const normalizedLayout = (layout?: ClassroomLayout): ClassroomLayout => ({
-  ...DEFAULT_LAYOUT,
-  ...(layout || {}),
-  id: 'main',
-  rows: Math.min(8, Math.max(1, Number(layout?.rows) || DEFAULT_LAYOUT.rows)),
-  columns: Math.min(6, Math.max(1, Number(layout?.columns) || DEFAULT_LAYOUT.columns)),
-  seatsPerDesk: Math.min(2, Math.max(1, Number(layout?.seatsPerDesk) || DEFAULT_LAYOUT.seatsPerDesk)),
-  teacherDeskSide: layout?.teacherDeskSide === 'right' ? 'right' : 'left',
-  assignments: { ...(layout?.assignments || {}) },
-});
+const defaultGroupOrder = (mode: 4 | 6) => mode === 4 ? [4, 2, 3, 1] : [1, 2, 3, 4, 5, 6];
+
+const seatIdsForLayout = (mode: 4 | 6, groupOrder: number[]) => {
+  const deskCount = mode === 6 ? 2 : 3;
+  return groupOrder.flatMap((group) => (
+    Array.from({ length: deskCount }, (_, deskIndex) => deskIndex + 1).flatMap((desk) => (
+      Array.from({ length: 4 }, (_, seatIndex) => seatId(group, desk, seatIndex + 1))
+    ))
+  ));
+};
+
+const normalizeLayout = (layout?: ClassroomLayout, configuredMode?: 4 | 6): ClassroomLayout => {
+  const mode: 4 | 6 = configuredMode || (Number(layout?.layoutMode) === 6 ? 6 : 4);
+  const fallbackOrder = defaultGroupOrder(mode);
+  const sourceOrder = Array.isArray(layout?.groupOrder) ? layout.groupOrder.map(Number) : [];
+  const groupOrder = sourceOrder.filter((group, index) => (
+    Number.isInteger(group)
+    && group >= 1
+    && group <= mode
+    && sourceOrder.indexOf(group) === index
+  ));
+  fallbackOrder.forEach((group) => {
+    if (!groupOrder.includes(group)) groupOrder.push(group);
+  });
+
+  const assignments = { ...(layout?.assignments || {}) };
+  const hasNewSeatIds = Object.keys(assignments).some((key) => /^G\d+D\d+S\d+$/.test(key));
+  if (!hasNewSeatIds && Object.keys(assignments).length > 0) {
+    const oldStudentIds = Object.entries(assignments)
+      .sort(([first], [second]) => first.localeCompare(second, undefined, { numeric: true }))
+      .map(([, studentId]) => studentId)
+      .filter(Boolean);
+    Object.keys(assignments).forEach((key) => delete assignments[key]);
+    seatIdsForLayout(mode, groupOrder).forEach((positionId, index) => {
+      if (oldStudentIds[index]) assignments[positionId] = oldStudentIds[index];
+    });
+  }
+
+  return {
+    ...DEFAULT_LAYOUT,
+    ...(layout || {}),
+    id: 'main',
+    layoutMode: mode,
+    groupOrder: groupOrder.slice(0, mode),
+    teacherDeskSide: layout?.teacherDeskSide === 'right' ? 'right' : 'left',
+    doorSide: layout?.doorSide === 'left' ? 'left' : 'right',
+    teacherDeskLabel: String(layout?.teacherDeskLabel || DEFAULT_LAYOUT.teacherDeskLabel),
+    doorLabel: String(layout?.doorLabel || DEFAULT_LAYOUT.doorLabel),
+    aisleLabel: String(layout?.aisleLabel || DEFAULT_LAYOUT.aisleLabel),
+    assignments,
+  };
+};
 
 export const ClassroomLayoutModule: React.FC<ClassroomLayoutModuleProps> = ({
   data,
@@ -52,10 +99,13 @@ export const ClassroomLayoutModule: React.FC<ClassroomLayoutModuleProps> = ({
 }) => {
   const { success, error } = useToast();
   const canEdit = userRole === 'gvcn';
-  const [layout, setLayout] = useState<ClassroomLayout>(() => normalizedLayout(data.classroomLayout));
+  const configuredGroupCount: 4 | 6 = Number(data.config.groupCount) === 6 ? 6 : 4;
+  const moduleRef = useRef<HTMLDivElement>(null);
+  const [layout, setLayout] = useState<ClassroomLayout>(() => normalizeLayout(data.classroomLayout, configuredGroupCount));
   const [isEditing, setIsEditing] = useState(canEdit && !data.classroomLayout);
   const [isSaving, setIsSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const students = useMemo(
     () => [...(data.students || [])].sort((first, second) => (
@@ -64,24 +114,11 @@ export const ClassroomLayoutModule: React.FC<ClassroomLayoutModuleProps> = ({
     )),
     [data.students]
   );
-
-  const studentById = useMemo(
-    () => new Map(students.map((student) => [student.id, student])),
-    [students]
+  const studentById = useMemo(() => new Map(students.map((student) => [student.id, student])), [students]);
+  const activeSeatIds = useMemo(
+    () => seatIdsForLayout(configuredGroupCount, layout.groupOrder),
+    [configuredGroupCount, layout.groupOrder]
   );
-
-  const activeSeatIds = useMemo(() => {
-    const ids: string[] = [];
-    for (let row = 1; row <= layout.rows; row += 1) {
-      for (let column = 1; column <= layout.columns; column += 1) {
-        for (let seat = 1; seat <= layout.seatsPerDesk; seat += 1) {
-          ids.push(seatId(row, column, seat));
-        }
-      }
-    }
-    return ids;
-  }, [layout.rows, layout.columns, layout.seatsPerDesk]);
-
   const activeSeatSet = useMemo(() => new Set(activeSeatIds), [activeSeatIds]);
   const assignedStudentIds = useMemo(
     () => new Set(
@@ -91,13 +128,16 @@ export const ClassroomLayoutModule: React.FC<ClassroomLayoutModuleProps> = ({
     ),
     [activeSeatSet, layout.assignments, studentById]
   );
-  const unassignedStudents = students.filter((student) => !assignedStudentIds.has(student.id));
 
   useEffect(() => {
-    if (isDirty) return;
-    setLayout(normalizedLayout(data.classroomLayout));
-    if (!data.classroomLayout && canEdit) setIsEditing(true);
-  }, [data.classroomLayout, canEdit, isDirty]);
+    if (!isDirty) setLayout(normalizeLayout(data.classroomLayout, configuredGroupCount));
+  }, [configuredGroupCount, data.classroomLayout, isDirty]);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => setIsFullscreen(document.fullscreenElement === moduleRef.current);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
 
   const updateLayout = (updates: Partial<ClassroomLayout>) => {
     setLayout((current) => ({ ...current, ...updates }));
@@ -107,33 +147,54 @@ export const ClassroomLayoutModule: React.FC<ClassroomLayoutModuleProps> = ({
   const handleSeatChange = (positionId: string, studentId: string) => {
     setLayout((current) => {
       const assignments = { ...current.assignments };
-      Object.keys(assignments).forEach((key) => {
-        if (assignments[key] === studentId && studentId) delete assignments[key];
-      });
-      if (studentId) assignments[positionId] = studentId;
-      else delete assignments[positionId];
+      if (studentId) {
+        Object.keys(assignments).forEach((key) => {
+          if (assignments[key] === studentId) delete assignments[key];
+        });
+        assignments[positionId] = studentId;
+      } else {
+        delete assignments[positionId];
+      }
       return { ...current, assignments };
     });
     setIsDirty(true);
   };
 
+  const handleGroupNumberChange = (currentGroup: number, requestedGroup: number) => {
+    if (currentGroup === requestedGroup) return;
+    const nextOrder = [...layout.groupOrder];
+    const currentIndex = nextOrder.indexOf(currentGroup);
+    const requestedIndex = nextOrder.indexOf(requestedGroup);
+    if (currentIndex < 0 || requestedIndex < 0) return;
+    [nextOrder[currentIndex], nextOrder[requestedIndex]] = [nextOrder[requestedIndex], nextOrder[currentIndex]];
+    updateLayout({ groupOrder: nextOrder });
+  };
+
+  const moveGroup = (group: number, direction: -1 | 1) => {
+    const nextOrder = [...layout.groupOrder];
+    const index = nextOrder.indexOf(group);
+    const targetIndex = index + direction;
+    if (index < 0 || targetIndex < 0 || targetIndex >= nextOrder.length) return;
+    [nextOrder[index], nextOrder[targetIndex]] = [nextOrder[targetIndex], nextOrder[index]];
+    updateLayout({ groupOrder: nextOrder });
+  };
+
   const handleAutoArrange = () => {
     const assignments: Record<string, string> = {};
     activeSeatIds.forEach((positionId, index) => {
-      const student = students[index];
-      if (student) assignments[positionId] = student.id;
+      if (students[index]) assignments[positionId] = students[index].id;
     });
     updateLayout({ assignments });
-    success('Đã xếp nhanh học sinh theo số thứ tự. Hãy kiểm tra và bấm Lưu sơ đồ.');
+    success('Đã xếp học sinh theo số thứ tự. Hãy kiểm tra và bấm Lưu.');
   };
 
   const handleClear = () => {
-    if (!window.confirm('Xóa toàn bộ vị trí đang xếp trong sơ đồ? Danh sách học sinh vẫn được giữ nguyên.')) return;
+    if (!window.confirm('Xóa toàn bộ vị trí học sinh đang xếp? Danh sách lớp vẫn được giữ nguyên.')) return;
     updateLayout({ assignments: {} });
   };
 
   const handleCancel = () => {
-    setLayout(normalizedLayout(data.classroomLayout));
+    setLayout(normalizeLayout(data.classroomLayout, configuredGroupCount));
     setIsDirty(false);
     setIsEditing(false);
   };
@@ -142,10 +203,13 @@ export const ClassroomLayoutModule: React.FC<ClassroomLayoutModuleProps> = ({
     setIsSaving(true);
     try {
       const result = await api.saveClassroomLayout({
-        rows: layout.rows,
-        columns: layout.columns,
-        seatsPerDesk: layout.seatsPerDesk,
+        layoutMode: configuredGroupCount,
+        groupOrder: layout.groupOrder,
         teacherDeskSide: layout.teacherDeskSide,
+        doorSide: layout.doorSide,
+        teacherDeskLabel: layout.teacherDeskLabel,
+        doorLabel: layout.doorLabel,
+        aisleLabel: layout.aisleLabel,
         assignments: layout.assignments,
       });
       if (result.success) {
@@ -161,259 +225,186 @@ export const ClassroomLayoutModule: React.FC<ClassroomLayoutModuleProps> = ({
     }
   };
 
-  const handleTeacherDeskSide = (side: TeacherDeskSide) => updateLayout({ teacherDeskSide: side });
+  const toggleFullscreen = async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await moduleRef.current?.requestFullscreen();
+    } catch {
+      error('Trình duyệt không thể mở chế độ toàn màn hình.');
+    }
+  };
 
-  const capacity = layout.rows * layout.columns * layout.seatsPerDesk;
+  const changeTeacherSide = (side: TeacherDeskSide) => updateLayout({
+    teacherDeskSide: side,
+    doorSide: side === 'left' ? 'right' : 'left',
+  });
+
+  const desksPerGroup = configuredGroupCount === 6 ? 2 : 3;
+  const rowCount = configuredGroupCount === 6 ? 3 : 2;
+  const capacity = configuredGroupCount * desksPerGroup * 4;
+
+  const renderFixture = (kind: 'teacher' | 'door') => {
+    const isTeacher = kind === 'teacher';
+    const label = isTeacher ? layout.teacherDeskLabel : layout.doorLabel;
+    if (isTeacher) {
+      return (
+        <div className="h-12 border-2 border-emerald-600 rounded-xl bg-emerald-50 flex items-center justify-center px-2">
+          {isEditing && canEdit ? (
+            <input
+              value={label}
+              onChange={(event) => updateLayout({ teacherDeskLabel: event.target.value })}
+              className="w-full bg-transparent text-center text-xs font-black text-emerald-950 outline-none"
+              aria-label="Tên bàn giáo viên"
+            />
+          ) : <span className="text-xs font-black text-emerald-950">{label}</span>}
+        </div>
+      );
+    }
+    return (
+      <div
+        className="h-12 bg-emerald-700 flex items-center justify-center pl-7 pr-2"
+        style={{ clipPath: 'polygon(17% 0,100% 0,100% 100%,17% 100%,17% 73%,0 50%,17% 27%)' }}
+      >
+        {isEditing && canEdit ? (
+          <input
+            value={label}
+            onChange={(event) => updateLayout({ doorLabel: event.target.value })}
+            className="w-full bg-transparent text-center text-xs font-black text-white outline-none"
+            aria-label="Tên cửa ra vào"
+          />
+        ) : <span className="text-xs font-black text-white">{label}</span>}
+      </div>
+    );
+  };
 
   return (
-    <div className="space-y-6 classroom-layout-print print-container">
-      <section className="rounded-[2rem] bg-gradient-to-br from-[#064e3b] via-[#095c47] to-[#043d2e] text-white p-6 sm:p-8 shadow-xl overflow-hidden relative">
-        <div className="absolute -right-10 -top-10 w-48 h-48 rounded-full bg-amber-300/10" />
-        <div className="relative flex flex-col xl:flex-row xl:items-center xl:justify-between gap-5">
+    <div
+      ref={moduleRef}
+      className={`h-[calc(100vh-90px)] min-h-[650px] print:h-auto print:min-h-0 flex flex-col gap-2 bg-[#f4f7f5] ${isFullscreen ? 'p-2' : ''}`}
+    >
+      <section className="no-print shrink-0 min-h-13 bg-white border border-emerald-200 rounded-2xl px-3 py-2 shadow-sm flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 mr-auto">
+          <LayoutGrid className="w-5 h-5 text-emerald-700" />
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-400 text-emerald-950 text-[11px] font-black uppercase tracking-wide mb-3">
-              <LayoutGrid className="w-4 h-4" /> Không gian lớp học
-            </div>
-            <h2 className="text-3xl sm:text-4xl font-black tracking-tight">Sơ đồ lớp {data.config.className}</h2>
-            <p className="mt-2 text-sm text-emerald-100 font-medium">
-              Bảng lớp ở phía trên • {layout.rows} hàng × {layout.columns} dãy • {capacity} chỗ ngồi
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 no-print">
-            {!isEditing && (
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/10 border border-white/25 text-white font-bold text-sm hover:bg-white/20 transition cursor-pointer"
-              >
-                <Printer className="w-4 h-4" /> In sơ đồ
-              </button>
-            )}
-            {canEdit && !isEditing && (
-              <button
-                type="button"
-                onClick={() => setIsEditing(true)}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-amber-400 text-emerald-950 font-black text-sm shadow-lg hover:bg-amber-300 transition cursor-pointer"
-              >
-                <Edit3 className="w-4 h-4" /> Chỉnh sửa sơ đồ
-              </button>
-            )}
+            <h2 className="text-sm font-black text-emerald-950">Sơ đồ lớp {data.config.className}</h2>
+            <p className="text-[10px] text-slate-500 font-semibold">{configuredGroupCount} tổ • {capacity} chỗ • Đã xếp {assignedStudentIds.size}/{students.length} học sinh</p>
           </div>
         </div>
+
+        {isEditing && canEdit ? (
+          <>
+            <span className="h-8 px-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-black inline-flex items-center">
+              {configuredGroupCount} tổ · đổi tại Cài đặt lớp
+            </span>
+            <label className="flex items-center gap-1 text-[10px] font-bold text-slate-500">
+              Bàn GV
+              <select value={layout.teacherDeskSide} onChange={(event) => changeTeacherSide(event.target.value as TeacherDeskSide)} className="h-8 px-2 rounded-lg border border-slate-200 bg-white text-xs font-black text-emerald-950">
+                <option value="left">Bên trái</option>
+                <option value="right">Bên phải</option>
+              </select>
+            </label>
+            <button type="button" onClick={handleAutoArrange} className="h-8 px-2.5 rounded-lg bg-emerald-50 text-emerald-800 text-[10px] font-black inline-flex items-center gap-1 cursor-pointer"><Shuffle className="w-3.5 h-3.5" /> Xếp theo STT</button>
+            <button type="button" onClick={handleClear} className="h-8 px-2.5 rounded-lg bg-rose-50 text-rose-700 text-[10px] font-black inline-flex items-center gap-1 cursor-pointer"><RotateCcw className="w-3.5 h-3.5" /> Xóa vị trí</button>
+            <button type="button" onClick={handleCancel} className="h-8 px-2.5 rounded-lg border border-slate-200 text-slate-700 text-[10px] font-black inline-flex items-center gap-1 cursor-pointer"><X className="w-3.5 h-3.5" /> Hủy</button>
+            <button type="button" onClick={handleSave} disabled={isSaving} className="h-8 px-3 rounded-lg bg-amber-400 text-emerald-950 text-[10px] font-black inline-flex items-center gap-1 cursor-pointer disabled:opacity-50"><Save className="w-3.5 h-3.5" /> {isSaving ? 'Đang lưu' : 'Lưu'}</button>
+          </>
+        ) : (
+          <>
+            <button type="button" onClick={() => window.print()} className="h-8 px-2.5 rounded-lg border border-emerald-200 text-emerald-800 text-[10px] font-black inline-flex items-center gap-1 cursor-pointer"><Printer className="w-3.5 h-3.5" /> In sơ đồ</button>
+            {canEdit && <button type="button" onClick={() => setIsEditing(true)} className="h-8 px-3 rounded-lg bg-amber-400 text-emerald-950 text-[10px] font-black inline-flex items-center gap-1 cursor-pointer"><Edit3 className="w-3.5 h-3.5" /> Chỉnh sửa</button>}
+          </>
+        )}
+        <button type="button" onClick={toggleFullscreen} className="h-8 px-2.5 rounded-lg bg-emerald-800 text-white text-[10px] font-black inline-flex items-center gap-1 cursor-pointer">
+          {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+          {isFullscreen ? 'Thoát toàn màn hình' : 'Toàn màn hình'}
+        </button>
       </section>
 
-      {isEditing && canEdit && (
-        <section className="no-print bg-white border border-emerald-100 rounded-[2rem] shadow-sm p-5 sm:p-6">
-          <div className="flex flex-col xl:flex-row xl:items-end gap-5 justify-between">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-1">
-              <label className="text-xs font-bold text-slate-600">
-                Số hàng bàn
-                <select
-                  value={layout.rows}
-                  onChange={(event) => updateLayout({ rows: Number(event.target.value) })}
-                  className="mt-1.5 w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-black text-emerald-950 outline-none focus:ring-2 focus:ring-emerald-400"
-                >
-                  {[1, 2, 3, 4, 5, 6, 7, 8].map((value) => <option key={value} value={value}>{value} hàng</option>)}
-                </select>
-              </label>
-              <label className="text-xs font-bold text-slate-600">
-                Số dãy bàn
-                <select
-                  value={layout.columns}
-                  onChange={(event) => updateLayout({ columns: Number(event.target.value) })}
-                  className="mt-1.5 w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-black text-emerald-950 outline-none focus:ring-2 focus:ring-emerald-400"
-                >
-                  {[1, 2, 3, 4, 5, 6].map((value) => <option key={value} value={value}>{value} dãy</option>)}
-                </select>
-              </label>
-              <label className="text-xs font-bold text-slate-600">
-                Chỗ mỗi bàn
-                <select
-                  value={layout.seatsPerDesk}
-                  onChange={(event) => updateLayout({ seatsPerDesk: Number(event.target.value) })}
-                  className="mt-1.5 w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-black text-emerald-950 outline-none focus:ring-2 focus:ring-emerald-400"
-                >
-                  <option value={1}>1 học sinh</option>
-                  <option value={2}>2 học sinh</option>
-                </select>
-              </label>
-              <div className="text-xs font-bold text-slate-600">
-                Bàn giáo viên
-                <div className="mt-1.5 grid grid-cols-2 rounded-xl border border-slate-200 overflow-hidden">
-                  {(['left', 'right'] as TeacherDeskSide[]).map((side) => (
-                    <button
-                      key={side}
-                      type="button"
-                      onClick={() => handleTeacherDeskSide(side)}
-                      className={`px-2 py-2.5 text-xs font-black cursor-pointer transition ${layout.teacherDeskSide === side ? 'bg-amber-400 text-emerald-950' : 'bg-white text-slate-600 hover:bg-emerald-50'}`}
-                    >
-                      {side === 'left' ? 'Bên trái' : 'Bên phải'}
-                    </button>
-                  ))}
+      <section className="classroom-print-area print-container flex-1 min-h-0 bg-white border-[3px] border-emerald-700 p-2.5 grid grid-rows-[minmax(0,1fr)_3rem] gap-2 shadow-sm overflow-hidden">
+        <div
+          className="min-h-0 grid gap-x-2.5 gap-y-1.5"
+          style={{ gridTemplateColumns: 'minmax(0,1fr) 3rem minmax(0,1fr)', gridTemplateRows: `repeat(${rowCount}, minmax(0, 1fr))` }}
+        >
+          <div className="col-start-2 row-start-1 row-end-[-1] border-x border-dashed border-emerald-200 flex items-center justify-center min-h-0">
+            {isEditing && canEdit ? (
+              <input
+                value={layout.aisleLabel}
+                onChange={(event) => updateLayout({ aisleLabel: event.target.value })}
+                className="w-56 rotate-90 bg-transparent text-center text-[10px] tracking-[0.18em] font-black text-slate-500 outline-none"
+                aria-label="Tên lối đi"
+              />
+            ) : <span className="[writing-mode:vertical-rl] rotate-180 text-[10px] tracking-[0.18em] font-black text-slate-400">{layout.aisleLabel}</span>}
+          </div>
+
+          {layout.groupOrder.map((group, positionIndex) => {
+            const row = Math.floor(positionIndex / 2) + 1;
+            const column = positionIndex % 2 === 0 ? 1 : 3;
+            return (
+              <div key={group} className="min-w-0 min-h-0 grid grid-rows-[1.75rem_minmax(0,1fr)]" style={{ gridColumn: column, gridRow: row }}>
+                <div className="flex items-center justify-center gap-1">
+                  {isEditing && canEdit && (
+                    <button type="button" onClick={() => moveGroup(group, -1)} className="no-print w-7 h-6 rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 flex items-center justify-center cursor-pointer"><ChevronLeft className="w-3.5 h-3.5" /></button>
+                  )}
+                  {isEditing && canEdit ? (
+                    <select value={group} onChange={(event) => handleGroupNumberChange(group, Number(event.target.value))} className="h-6 min-w-18 px-2 rounded-md border-0 bg-emerald-700 text-white text-[11px] font-black text-center cursor-pointer">
+                      {Array.from({ length: configuredGroupCount }, (_, index) => index + 1).map((value) => <option key={value} value={value}>TỔ {value}</option>)}
+                    </select>
+                  ) : <span className="min-w-18 px-3 py-1 rounded-md bg-emerald-700 text-white text-[11px] font-black text-center">TỔ {group}</span>}
+                  {isEditing && canEdit && (
+                    <button type="button" onClick={() => moveGroup(group, 1)} className="no-print w-7 h-6 rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 flex items-center justify-center cursor-pointer"><ChevronRight className="w-3.5 h-3.5" /></button>
+                  )}
                 </div>
-              </div>
-            </div>
 
-            <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={handleAutoArrange} className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-emerald-50 text-emerald-800 font-bold text-xs hover:bg-emerald-100 cursor-pointer">
-                <Shuffle className="w-4 h-4" /> Xếp theo STT
-              </button>
-              <button type="button" onClick={handleClear} className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-rose-50 text-rose-700 font-bold text-xs hover:bg-rose-100 cursor-pointer">
-                <RotateCcw className="w-4 h-4" /> Xóa vị trí
-              </button>
-              <button type="button" onClick={handleCancel} className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 cursor-pointer">
-                <X className="w-4 h-4" /> Hủy
-              </button>
-              <button type="button" onClick={handleSave} disabled={isSaving} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#064e3b] text-white font-black text-xs hover:bg-[#095c47] disabled:opacity-50 cursor-pointer">
-                <Save className="w-4 h-4" /> {isSaving ? 'Đang lưu...' : 'Lưu sơ đồ'}
-              </button>
-            </div>
-          </div>
-
-          <div className={`mt-4 flex items-start gap-2 px-4 py-3 rounded-xl text-xs font-semibold ${capacity < students.length ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-800'}`}>
-            {capacity < students.length ? <AlertCircle className="w-4 h-4 shrink-0" /> : <CheckCircle2 className="w-4 h-4 shrink-0" />}
-            <span>
-              Sơ đồ có {capacity} chỗ cho {students.length} học sinh. {capacity < students.length
-                ? `Cần thêm ít nhất ${students.length - capacity} chỗ để xếp đủ cả lớp.`
-                : 'Có thể để trống các chỗ chưa sử dụng.'}
-            </span>
-          </div>
-        </section>
-      )}
-
-      {!canEdit && !data.classroomLayout && (
-        <div className="rounded-2xl bg-amber-50 border border-amber-200 px-5 py-4 text-amber-900 text-sm font-semibold">
-          GVCN chưa tạo sơ đồ chỗ ngồi cho lớp.
-        </div>
-      )}
-
-      <section className="bg-white border border-emerald-100 rounded-[2rem] shadow-sm p-4 sm:p-7 overflow-x-auto">
-        <div className="min-w-[760px]">
-          <div className="w-2/3 mx-auto rounded-2xl bg-slate-800 text-white text-center py-3 px-5 shadow-md border-b-4 border-amber-400">
-            <div className="text-sm font-black tracking-[0.25em]">BẢNG LỚP</div>
-          </div>
-
-          <div className={`mt-5 flex ${layout.teacherDeskSide === 'left' ? 'justify-start' : 'justify-end'}`}>
-            <div className="w-48 rounded-2xl bg-amber-100 border-2 border-amber-300 text-amber-950 px-4 py-3 text-center shadow-sm">
-              <div className="text-xs font-black uppercase tracking-wide">Bàn giáo viên</div>
-              <div className="text-[10px] font-semibold mt-0.5">Phía {layout.teacherDeskSide === 'left' ? 'bên trái' : 'bên phải'} lớp</div>
-            </div>
-          </div>
-
-          <div className="mt-8 space-y-5">
-            {Array.from({ length: layout.rows }, (_, rowIndex) => rowIndex + 1).map((row) => (
-              <div key={row}>
-                <div className="flex items-center gap-3 mb-2">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 whitespace-nowrap">Hàng {row}</span>
-                  <span className="h-px bg-slate-100 flex-1" />
-                </div>
-                <div
-                  className="grid gap-4"
-                  style={{ gridTemplateColumns: `repeat(${layout.columns}, minmax(0, 1fr))` }}
-                >
-                  {Array.from({ length: layout.columns }, (_, columnIndex) => columnIndex + 1).map((column) => (
-                    <div key={`${row}-${column}`} className="rounded-2xl border-2 border-emerald-100 bg-emerald-50/50 p-2 shadow-sm">
-                      <div className="text-center text-[9px] uppercase tracking-wider font-black text-emerald-700 mb-1.5">
-                        Bàn {column}
-                      </div>
-                      <div className={`grid gap-1.5 ${layout.seatsPerDesk === 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                        {Array.from({ length: layout.seatsPerDesk }, (_, seatIndex) => seatIndex + 1).map((seat) => {
-                          const positionId = seatId(row, column, seat);
-                          const assignedId = layout.assignments[positionId] || '';
-                          const student = studentById.get(assignedId);
-                          return (
-                            <div key={positionId} className="min-h-16 rounded-xl bg-white border border-emerald-100 flex items-center justify-center p-1.5 text-center">
-                              {isEditing && canEdit ? (
-                                <select
-                                  value={assignedId}
-                                  onChange={(event) => handleSeatChange(positionId, event.target.value)}
-                                  className="w-full min-w-0 bg-transparent text-[11px] leading-tight font-bold text-slate-800 outline-none cursor-pointer"
-                                  aria-label={`Hàng ${row}, dãy ${column}, chỗ ${seat}`}
-                                >
-                                  <option value="">— Trống —</option>
-                                  {students.map((item) => (
-                                    <option
-                                      key={item.id}
-                                      value={item.id}
-                                      disabled={assignedStudentIds.has(item.id) && item.id !== assignedId}
-                                    >
-                                      {item.orderNumber}. {item.fullName}
-                                    </option>
-                                  ))}
-                                </select>
-                              ) : student ? (
-                                <div>
-                                  <div className="text-xs font-black text-emerald-950 leading-tight">{student.fullName}</div>
-                                  <div className="text-[9px] text-emerald-700 font-bold mt-1">STT {student.orderNumber} • Tổ {student.groupNumber}</div>
-                                </div>
-                              ) : (
-                                <span className="text-[10px] text-slate-300 font-semibold">Chỗ trống</span>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
+                <div className="min-h-0 grid gap-1" style={{ gridTemplateRows: `repeat(${desksPerGroup}, minmax(0, 1fr))` }}>
+                  {Array.from({ length: desksPerGroup }, (_, deskIndex) => deskIndex + 1).map((desk) => (
+                    <div key={desk} className="min-h-0 grid grid-cols-4 border border-emerald-300 bg-white">
+                      {Array.from({ length: 4 }, (_, seatIndex) => seatIndex + 1).map((seat) => {
+                        const positionId = seatId(group, desk, seat);
+                        const assignedId = layout.assignments[positionId] || '';
+                        const student = studentById.get(assignedId);
+                        return (
+                          <div key={positionId} className="min-w-0 min-h-0 border-r last:border-r-0 border-emerald-200 flex items-center justify-center p-0.5 text-center">
+                            {isEditing && canEdit ? (
+                              <select
+                                value={assignedId}
+                                onChange={(event) => handleSeatChange(positionId, event.target.value)}
+                                className="w-full h-full min-h-7 bg-transparent border-0 px-0.5 text-[10px] font-bold text-slate-800 text-center outline-none cursor-pointer"
+                                aria-label={`Tổ ${group}, bàn ${desk}, chỗ ${seat}`}
+                              >
+                                <option value="">—</option>
+                                {students.map((item) => (
+                                  <option key={item.id} value={item.id} disabled={assignedStudentIds.has(item.id) && item.id !== assignedId}>
+                                    {item.orderNumber}. {item.fullName}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : student ? (
+                              <div className="leading-tight">
+                                <div className="text-[10px] sm:text-[11px] font-black text-slate-900">{student.fullName}</div>
+                                <div className="text-[8px] sm:text-[9px] font-bold text-emerald-700 mt-0.5">STT {student.orderNumber}</div>
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })}
                     </div>
                   ))}
                 </div>
               </div>
-            ))}
-          </div>
+            );
+          })}
+        </div>
 
-          <div className="mt-8 flex items-center justify-center gap-3 text-xs font-bold text-slate-400">
-            <span className="h-px bg-slate-200 w-20" /> CUỐI LỚP <span className="h-px bg-slate-200 w-20" />
-          </div>
+        <div className="grid grid-cols-[11rem_minmax(8rem,1fr)_11rem] gap-3 items-center">
+          {layout.teacherDeskSide === 'left' ? renderFixture('teacher') : renderFixture('door')}
+          <div className="text-center text-xl font-black text-emerald-950">LỚP {String(data.config.className || '').toUpperCase()}</div>
+          {layout.teacherDeskSide === 'right' ? renderFixture('teacher') : renderFixture('door')}
         </div>
       </section>
-
-      <section className="bg-white border border-emerald-100 rounded-[2rem] shadow-sm p-5 sm:p-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <span className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center"><Users className="w-5 h-5 text-emerald-700" /></span>
-            <div>
-              <div className="font-black text-emerald-950">Đã xếp {assignedStudentIds.size}/{students.length} học sinh</div>
-              <div className="text-xs text-slate-500 mt-0.5">
-                {data.classroomLayout?.updatedAt
-                  ? `Cập nhật gần nhất bởi ${data.classroomLayout.updatedBy || userName}`
-                  : 'Sơ đồ chưa được lưu lần nào.'}
-              </div>
-            </div>
-          </div>
-          {unassignedStudents.length > 0 && (
-            <div className="text-xs font-semibold text-amber-800 bg-amber-50 rounded-xl px-3 py-2">
-              Còn {unassignedStudents.length} học sinh chưa xếp chỗ
-            </div>
-          )}
-        </div>
-
-        {isEditing && canEdit && unassignedStudents.length > 0 && (
-          <div className="mt-4 flex flex-wrap gap-2 no-print">
-            {unassignedStudents.map((student) => (
-              <span key={student.id} className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-[11px] font-bold">
-                {student.orderNumber}. {student.fullName}
-              </span>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {canEdit && isEditing && isDirty && (
-        <div className="fixed bottom-24 lg:bottom-6 right-5 z-30 no-print">
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={isSaving}
-            className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-amber-400 text-emerald-950 font-black text-sm shadow-2xl border border-amber-300 hover:bg-amber-300 disabled:opacity-50 cursor-pointer"
-          >
-            <Save className="w-5 h-5" /> {isSaving ? 'Đang lưu...' : 'Lưu thay đổi'}
-          </button>
-        </div>
-      )}
 
       {!canEdit && data.classroomLayout && (
-        <div className="flex items-center gap-2 justify-center text-xs text-emerald-800 font-semibold">
-          <CheckCircle2 className="w-4 h-4" /> Bạn đang xem sơ đồ lớp do GVCN cập nhật.
+        <div className="no-print shrink-0 flex items-center justify-center gap-1 text-[10px] text-emerald-700 font-bold">
+          <CheckCircle2 className="w-3.5 h-3.5" /> Sơ đồ do GVCN cập nhật {data.classroomLayout.updatedBy ? `• ${data.classroomLayout.updatedBy}` : `• ${userName}`}
         </div>
       )}
     </div>

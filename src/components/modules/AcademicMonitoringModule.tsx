@@ -12,7 +12,7 @@ import {
   Calendar
 } from 'lucide-react';
 import { FullClassData } from '../../types';
-import { computeStudentScores } from '../../utils/calculations';
+import { computeStudentScores, getConfiguredGroupNumbers } from '../../utils/calculations';
 
 interface AcademicMonitoringModuleProps {
   data: FullClassData;
@@ -155,7 +155,7 @@ export const AcademicMonitoringModule: React.FC<AcademicMonitoringModuleProps> =
               >
                 Tất cả tổ
               </button>
-              {[1, 2, 3, 4].map(g => (
+              {getConfiguredGroupNumbers(data.config).map(g => (
                 <button
                   key={g}
                   onClick={() => setSelectedGroup(g)}
