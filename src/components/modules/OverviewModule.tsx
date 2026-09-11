@@ -42,8 +42,8 @@ export const OverviewModule: React.FC<OverviewModuleProps> = ({
 
   const isWeekLocked = weekLocks.some(wl => wl.month === selectedMonth && wl.week === selectedWeek && wl.isLocked);
 
-  const studentSummaries = computeStudentScores(students, transactions, selectedMonth);
-  const groupStandings = computeGroupStandings(students, transactions, groupBonuses, selectedMonth);
+  const studentSummaries = computeStudentScores(students, transactions, selectedMonth, data.config);
+  const groupStandings = computeGroupStandings(students, transactions, groupBonuses, selectedMonth, data.config);
 
   // Total fault counts
   const totalDiscipline = studentSummaries.reduce((sum, s) => sum + s.disciplineFaults, 0);
@@ -55,7 +55,7 @@ export const OverviewModule: React.FC<OverviewModuleProps> = ({
 
   // Students Needing Attention (Bottom with lowest scores or highest faults)
   const attentionStudents = [...studentSummaries]
-    .filter(s => s.monthTotal < 80 || s.disciplineFaults > 2 || s.academicFaults > 2)
+    .filter(s => s.conductRank === 'Chưa đạt' || s.disciplineFaults > 2 || s.academicFaults > 2)
     .slice(0, 5);
 
   return (

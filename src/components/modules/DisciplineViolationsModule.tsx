@@ -37,7 +37,7 @@ export const DisciplineViolationsModule: React.FC<DisciplineViolationsModuleProp
   const students = data.students || [];
   const transactions = data.transactions || [];
 
-  const studentSummaries = computeStudentScores(students, transactions, selectedMonth);
+  const studentSummaries = computeStudentScores(students, transactions, selectedMonth, data.config);
 
   // Totals for summary KPI cards
   const totalSleeping = studentSummaries.reduce((sum, s) => sum + s.faultBreakdown.sleeping, 0);

@@ -49,8 +49,9 @@ export const GroupCompetitionModule: React.FC<GroupCompetitionModuleProps> = ({
   const transactions = data.transactions || [];
   const groupBonuses = data.groupBonuses || [];
 
-  const standings = computeGroupStandings(students, transactions, groupBonuses, selectedMonth);
-  const studentScores = computeStudentScores(students, transactions, selectedMonth);
+  const standings = computeGroupStandings(students, transactions, groupBonuses, selectedMonth, data.config);
+  const studentScores = computeStudentScores(students, transactions, selectedMonth, data.config);
+  const monthWeekNumbers = studentScores[0]?.monthWeekNumbers || [];
 
   const isGvcn = userRole === 'gvcn';
 
@@ -120,7 +121,10 @@ export const GroupCompetitionModule: React.FC<GroupCompetitionModuleProps> = ({
           </label>
           {isGvcn && (
             <button
-              onClick={() => setShowBonusModal(true)}
+              onClick={() => {
+                setBonusWeek(monthWeekNumbers.includes(selectedWeek) ? selectedWeek : (monthWeekNumbers[0] || selectedWeek));
+                setShowBonusModal(true);
+              }}
               className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-emerald-950 font-bold text-xs sm:text-sm shadow-md transition active:scale-95 cursor-pointer shrink-0"
             >
               <Gift className="w-4 h-4 text-emerald-950" />
@@ -208,10 +212,9 @@ export const GroupCompetitionModule: React.FC<GroupCompetitionModuleProps> = ({
                 <th className="p-3">Thứ hạng</th>
                 <th className="p-3">Tổ thi đua</th>
                 <th className="p-3 text-center">Sĩ số</th>
-                <th className="p-3 text-center">Tuần 1</th>
-                <th className="p-3 text-center">Tuần 2</th>
-                <th className="p-3 text-center">Tuần 3</th>
-                <th className="p-3 text-center">Tuần 4</th>
+                {monthWeekNumbers.map((week) => (
+                  <th key={week} className="p-3 text-center">Tuần {week}</th>
+                ))}
                 <th className="p-3 text-center">TB cá nhân/HS</th>
                 <th className="p-3 text-center">Điểm thưởng tổ</th>
                 <th className="p-3 text-center font-black">Điểm xếp hạng</th>
@@ -241,18 +244,11 @@ export const GroupCompetitionModule: React.FC<GroupCompetitionModuleProps> = ({
                       <td className="p-3 text-center font-medium text-slate-600">
                         {g.memberCount} HS
                       </td>
-                      <td className="p-3 text-center font-semibold text-slate-700">
-                        {formatSignedPoints(g.weekAverages[1] || 0, 'đ')}
-                      </td>
-                      <td className="p-3 text-center font-semibold text-slate-700">
-                        {formatSignedPoints(g.weekAverages[2] || 0, 'đ')}
-                      </td>
-                      <td className="p-3 text-center font-semibold text-slate-700">
-                        {formatSignedPoints(g.weekAverages[3] || 0, 'đ')}
-                      </td>
-                      <td className="p-3 text-center font-semibold text-slate-700">
-                        {formatSignedPoints(g.weekAverages[4] || 0, 'đ')}
-                      </td>
+                      {monthWeekNumbers.map((week) => (
+                        <td key={week} className="p-3 text-center font-semibold text-slate-700">
+                          {formatSignedPoints(g.weekAverages[week] || 0, 'đ')}
+                        </td>
+                      ))}
                       <td className="p-3 text-center font-bold text-slate-800">
                         {formatAveragePoints(g.memberPointsAverage)}đ
                       </td>
@@ -276,7 +272,7 @@ export const GroupCompetitionModule: React.FC<GroupCompetitionModuleProps> = ({
                     {/* Expandable Member List */}
                     {isExpanded && (
                       <tr className="bg-emerald-50/40">
-                        <td colSpan={11} className="p-4">
+                        <td colSpan={7 + monthWeekNumbers.length} className="p-4">
                           <div className="text-xs font-black text-emerald-950 mb-2 uppercase">
                             Thành viên {g.groupName} ({members.length} học sinh):
                           </div>
@@ -336,10 +332,9 @@ export const GroupCompetitionModule: React.FC<GroupCompetitionModuleProps> = ({
                   onChange={(e) => setBonusWeek(Number(e.target.value))}
                   className="w-full p-2.5 rounded-xl border border-slate-300 font-bold text-xs bg-white"
                 >
-                  <option value={1}>Tuần 1</option>
-                  <option value={2}>Tuần 2</option>
-                  <option value={3}>Tuần 3</option>
-                  <option value={4}>Tuần 4</option>
+                  {monthWeekNumbers.map((week) => (
+                    <option key={week} value={week}>Tuần {week}</option>
+                  ))}
                 </select>
               </div>
 

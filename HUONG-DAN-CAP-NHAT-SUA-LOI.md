@@ -39,6 +39,10 @@
 23. Mục **Theo dõi học tập** đã bỏ bộ lọc chọn môn; hệ thống luôn tổng hợp đầy đủ dữ liệu học tập của tất cả môn trong tháng đang xem.
 24. Danh mục quy chế điểm có nút **Sửa** tại từng dòng; GVCN có thể cập nhật nội dung, loại cộng/trừ, điểm mặc định, lĩnh vực và các yêu cầu nhập liệu. Hệ thống giữ nguyên mã quy định để cập nhật đúng bản ghi, không tạo bản sao và không làm mất các quy định khác.
 25. Bốn quy định **Đạt điểm 7, 8, 9, 10** dùng ô tự nhập tên môn học; danh sách hình thức kiểm tra vẫn được giữ nguyên.
+26. Tổng quan tháng, thi đua theo tổ và rèn luyện cá nhân đã bỏ cách cộng cứng Tuần 1–4. Hệ thống cộng toàn bộ giao dịch đúng tháng và hiển thị các số tuần toàn năm thực sự thuộc tháng đó.
+27. Báo bài & Thời khóa biểu và Lịch trực nhật hiển thị đủ toàn bộ số tuần đã khai báo trong Cài đặt lớp, không còn giới hạn 16 tuần.
+28. Cấu hình thời khóa biểu có thêm lựa chọn **7 tiết (Sáng 1–4 + Chiều 1–3)**; tiết sáng và chiều được lưu độc lập.
+29. Cài đặt lớp có thêm ba ngưỡng điểm Tốt, Khá và Đạt do GVCN tự nhập. Khi chưa cài đặt, hệ thống ghi **Chưa thiết lập** thay vì tự áp dụng ngưỡng cố định; sau khi lưu, quy chế được đồng bộ sang các bảng tổng hợp, học kỳ/cả năm và phiếu in.
 
 ## Cách kiểm tra trên máy
 
@@ -73,6 +77,10 @@ Sau đó mở địa chỉ Vite hiển thị trong Terminal và kiểm tra lần
 - Đổi tháng ngay tại Vi phạm rèn luyện, Theo dõi học tập và Rèn luyện cá nhân; kiểm tra tiêu đề và số liệu cùng đổi theo tháng.
 - Vào Cài đặt → Danh mục quy chế điểm, bấm biểu tượng bút chì tại một quy định, sửa số điểm rồi lưu; tải lại trang và xác nhận điểm mới vẫn còn, các quy định khác không bị mất.
 - Trong Nhập điểm tuần, chọn lần lượt Đạt điểm 7, 8, 9, 10 và xác nhận ô Môn học cho phép tự gõ tên môn.
+- Ghi điểm ở một tuần lớn hơn 4 (ví dụ Tuần 6), mở Tổng quan tháng và Thi đua theo tổ; xác nhận điểm tháng, điểm tuần và điểm tổ đều được cộng đúng.
+- Đổi tổng số tuần trong Cài đặt lớp rồi mở Báo bài và Lịch trực nhật; xác nhận danh sách hiển thị đủ từ Tuần 1 đến tuần cuối đã cài.
+- Chọn **7 tiết (Sáng 1–4 + Chiều 1–3)**, nhập Tiết 1 buổi sáng và Tiết 1 buổi chiều để xác nhận hai tiết không ghi đè nhau.
+- Nhập ba ngưỡng xếp loại trong Cài đặt lớp, lưu lại rồi kiểm tra cùng một học sinh có kết quả thống nhất tại Tổng quan, Rèn luyện cá nhân, học kỳ/cả năm và phiếu in.
 
 ## Đưa lên GitHub Pages
 

@@ -33,7 +33,7 @@ export const AcademicMonitoringModule: React.FC<AcademicMonitoringModuleProps> =
   const students = data.students || [];
   const transactions = data.transactions || [];
 
-  const studentSummaries = computeStudentScores(students, transactions, selectedMonth);
+  const studentSummaries = computeStudentScores(students, transactions, selectedMonth, data.config);
 
   // Filter transactions for academic metrics
   const academicTxs = transactions.filter(t => {

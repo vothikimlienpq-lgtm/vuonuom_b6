@@ -25,7 +25,8 @@ export const ParentPortal: React.FC<ParentPortalProps> = ({ session, onLogout })
 
   const homework = view.weeklyHomework;
   const morningPeriods = Number(view.config?.morningPeriods) || 5;
-  const usesSplitPeriodNumbering = view.config?.scheduleStructure === 'split10';
+  const usesSplitPeriodNumbering = view.config?.scheduleStructure === 'split10'
+    || view.config?.scheduleStructure === 'split7';
   const getTimetablePeriodLabel = (item: { period: number; session?: 'morning' | 'afternoon' }) => {
     const session = item.session || (item.period <= morningPeriods ? 'morning' : 'afternoon');
     let displayPeriod = item.period;

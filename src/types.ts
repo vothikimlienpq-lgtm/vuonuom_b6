@@ -2,6 +2,15 @@ export type UserRole = 'guest' | 'student' | 'bcs' | 'gvcn' | 'parent';
 
 export type DayOfWeek = 'Thứ 2' | 'Thứ 3' | 'Thứ 4' | 'Thứ 5' | 'Thứ 6' | 'Thứ 7';
 
+export interface ConductThresholds {
+  /** Điểm tối thiểu để xếp loại Tốt. */
+  totMin: number;
+  /** Điểm tối thiểu để xếp loại Khá. */
+  khaMin: number;
+  /** Điểm tối thiểu để xếp loại Đạt; thấp hơn mức này là Chưa đạt. */
+  datMin: number;
+}
+
 export interface ClassConfig {
   id: string;
   initialized?: boolean;
@@ -21,7 +30,9 @@ export interface ClassConfig {
   periodsPerDay?: number; // 5, 8, 10, etc.
   morningPeriods?: number; // default 5
   afternoonPeriods?: number; // default 3
-  scheduleStructure?: 'standard8' | 'standard5' | 'split10' | 'custom';
+  scheduleStructure?: 'standard8' | 'standard5' | 'split7' | 'split10' | 'custom';
+  /** Ngưỡng xếp loại do GVCN tự cấu hình; bỏ trống thì chưa thực hiện xếp loại bằng điểm. */
+  conductThresholds?: Partial<ConductThresholds>;
   subjects: string[];
   cleaningTasks: string[];
   hasGvcnPassword?: boolean;

@@ -107,3 +107,17 @@ export function getCurrentWeekAndMonth(week1StartDateStr?: string): {
     weekInfo
   };
 }
+
+/**
+ * Danh sách số tuần toàn năm thuộc một tháng. Tháng của tuần được xác định theo
+ * ngày Thứ Hai, thống nhất với cách ứng dụng lưu month khi giáo viên chọn tuần.
+ */
+export function getWeekNumbersForMonth(
+  week1StartDateStr: string | undefined,
+  totalWeeks: number,
+  month: number
+): number[] {
+  const safeTotalWeeks = Math.max(1, Number(totalWeeks) || 38);
+  return Array.from({ length: safeTotalWeeks }, (_, index) => index + 1)
+    .filter((week) => getWeekDateRange(week1StartDateStr, week).monthNum === month);
+}

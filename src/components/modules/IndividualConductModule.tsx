@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { FullClassData, Student, UserRole, UserSession } from '../../types';
 import { ModuleTab } from '../Navigation';
-import { computeStudentScores, formatSignedPoints, getSignedTransactionPoints, StudentScoreSummary } from '../../utils/calculations';
+import { computeStudentScores, formatConductThresholds, formatSignedPoints, getSignedTransactionPoints, StudentScoreSummary } from '../../utils/calculations';
 import { ParentReportPrintModal } from '../ParentReportPrintModal';
 import { useToast } from '../Toast';
 import { ConductYearSummary } from './ConductYearSummary';
@@ -62,7 +62,9 @@ export const IndividualConductModule: React.FC<IndividualConductModuleProps> = (
   const transactions = data.transactions || [];
   const homeworkTasks = data.homeworkTasks || [];
 
-  const studentSummaries = computeStudentScores(students, transactions, selectedMonth);
+  const studentSummaries = computeStudentScores(students, transactions, selectedMonth, data.config);
+  const monthWeekNumbers = studentSummaries[0]?.monthWeekNumbers || [];
+  const conductThresholdLabel = formatConductThresholds(data.config.conductThresholds);
 
   const viewSwitcher = (
     <div className="bg-white rounded-2xl p-1.5 border border-emerald-100 shadow-sm inline-flex items-center gap-1">
@@ -207,7 +209,7 @@ export const IndividualConductModule: React.FC<IndividualConductModuleProps> = (
                 {formatSignedPoints(summary.monthTotal, 'đ')}
               </div>
               <div className="text-[11px] text-slate-500 mt-2 font-medium">
-                Khởi điểm: +200đ mỗi tháng
+                Điểm cộng trừ đã ghi nhận trong tháng
               </div>
             </div>
 
@@ -219,7 +221,7 @@ export const IndividualConductModule: React.FC<IndividualConductModuleProps> = (
                 {summary.monthAverage}đ
               </div>
               <div className="text-[11px] text-slate-500 mt-2 font-medium">
-                Mục tiêu duy trì: ≥50đ/tuần
+                Trung bình theo {Math.max(1, monthWeekNumbers.length)} tuần của tháng
               </div>
             </div>
 
@@ -233,7 +235,7 @@ export const IndividualConductModule: React.FC<IndividualConductModuleProps> = (
                 </span>
               </div>
               <div className="text-[11px] text-slate-500 mt-2 font-medium">
-                Quy chế: Tốt (≥200đ) • Khá (100-199đ)
+                {conductThresholdLabel}
               </div>
             </div>
 
@@ -256,18 +258,16 @@ export const IndividualConductModule: React.FC<IndividualConductModuleProps> = (
         {summary && (
           <div className="bg-white rounded-[24px] p-5 sm:p-6 shadow-xs border border-emerald-100">
             <h3 className="text-sm font-black text-emerald-950 uppercase tracking-wider mb-3">
-              📊 Diễn biến điểm rèn luyện 4 tuần trong Tháng {selectedMonth}:
+              📊 Diễn biến điểm rèn luyện theo tuần trong Tháng {selectedMonth}:
             </h3>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {[1, 2, 3, 4].map(w => (
+              {monthWeekNumbers.map(w => (
                 <div key={w} className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-100 text-center">
                   <div className="text-xs font-bold text-slate-500 uppercase">Tuần {w}</div>
                   <div className="text-2xl font-black text-[#064e3b] mt-1">
                     {formatSignedPoints(summary.weekScores[w] || 0, 'đ')}
                   </div>
-                  <div className="text-[10px] text-emerald-800 font-medium mt-1">
-                    {(summary.weekScores[w] || 0) >= 50 ? '✓ Đạt chuẩn tuần' : 'Cần phấn đấu thêm'}
-                  </div>
+                  <div className="text-[10px] text-emerald-800 font-medium mt-1">Điểm phát sinh trong tuần</div>
                 </div>
               ))}
             </div>
@@ -466,7 +466,7 @@ export const IndividualConductModule: React.FC<IndividualConductModuleProps> = (
             <span>Bảng Điểm Rèn Luyện Cá Nhân Tháng {selectedMonth}</span>
           </h2>
           <p className="text-emerald-100 text-xs sm:text-sm mt-1">
-            Xếp loại rèn luyện theo quy chế: Tốt (≥200đ) • Khá (100–199đ) • Đạt (51–99đ) • Chưa đạt (≤50đ).
+            {conductThresholdLabel}
           </p>
         </div>
 
@@ -523,6 +523,7 @@ export const IndividualConductModule: React.FC<IndividualConductModuleProps> = (
               <option value="Khá">Xếp loại Khá</option>
               <option value="Đạt">Xếp loại Đạt</option>
               <option value="Chưa đạt">Chưa đạt</option>
+              <option value="Chưa thiết lập">Chưa thiết lập quy chế</option>
             </select>
           </div>
 
@@ -566,10 +567,9 @@ export const IndividualConductModule: React.FC<IndividualConductModuleProps> = (
                 <th className="p-3">Họ và tên</th>
                 <th className="p-3 text-center">Tổ</th>
                 <th className="p-3">Chức vụ</th>
-                <th className="p-3 text-center">Tuần 1</th>
-                <th className="p-3 text-center">Tuần 2</th>
-                <th className="p-3 text-center">Tuần 3</th>
-                <th className="p-3 text-center">Tuần 4</th>
+                {monthWeekNumbers.map((week) => (
+                  <th key={week} className="p-3 text-center">Tuần {week}</th>
+                ))}
                 <th className="p-3 text-center font-black">Tổng tháng</th>
                 <th className="p-3 text-center">Điểm TB</th>
                 <th className="p-3 text-center">Xếp loại</th>
@@ -608,18 +608,11 @@ export const IndividualConductModule: React.FC<IndividualConductModuleProps> = (
                         <span className="text-slate-400">Thành viên</span>
                       )}
                     </td>
-                    <td className="p-3 text-center font-semibold text-slate-700">
-                      {formatSignedPoints(s.weekScores[1] || 0)}
-                    </td>
-                    <td className="p-3 text-center font-semibold text-slate-700">
-                      {formatSignedPoints(s.weekScores[2] || 0)}
-                    </td>
-                    <td className="p-3 text-center font-semibold text-slate-700">
-                      {formatSignedPoints(s.weekScores[3] || 0)}
-                    </td>
-                    <td className="p-3 text-center font-semibold text-slate-700">
-                      {formatSignedPoints(s.weekScores[4] || 0)}
-                    </td>
+                    {monthWeekNumbers.map((week) => (
+                      <td key={week} className="p-3 text-center font-semibold text-slate-700">
+                        {formatSignedPoints(s.weekScores[week] || 0)}
+                      </td>
+                    ))}
                     <td className="p-3 text-center font-black text-emerald-800 text-sm">
                       {s.monthTotal}đ
                     </td>

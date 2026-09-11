@@ -60,7 +60,7 @@ export const HomeworkScheduleModule: React.FC<HomeworkScheduleModuleProps> = ({
   const totalPeriods = Number(config.periodsPerDay) || 8;
   const morningCount = Number(config.morningPeriods) || 5;
   const afternoonCount = Math.max(0, totalPeriods - morningCount);
-  const usesSplitPeriodNumbering = config.scheduleStructure === 'split10';
+  const usesSplitPeriodNumbering = config.scheduleStructure === 'split10' || config.scheduleStructure === 'split7';
 
   const timetable = data.timetable || [];
   const homeworkList = data.homeworkTasks || [];
@@ -388,7 +388,7 @@ export const HomeworkScheduleModule: React.FC<HomeworkScheduleModuleProps> = ({
 
       {/* Week Selector Chips */}
       <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-        {Array.from({ length: Math.min(totalWeeks, 16) }, (_, i) => i + 1).map((w) => {
+        {Array.from({ length: totalWeeks }, (_, i) => i + 1).map((w) => {
           const isSelected = currentWeek === w;
           const isLocked = weekLocks.some(l => l.week === w && l.isLocked);
 

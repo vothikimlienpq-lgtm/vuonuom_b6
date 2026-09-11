@@ -207,8 +207,8 @@ export const ParentReportPrintModal: React.FC<ParentReportPrintModalProps> = ({
   }), [allTransactions, reportScope, reportWeek, reportMonth, semesterStartWeek, semesterEndWeek, totalWeeks]);
 
   const monthlySummaries = useMemo(
-    () => computeStudentScores(allStudents, allTransactions, reportMonth),
-    [allStudents, allTransactions, reportMonth]
+    () => computeStudentScores(allStudents, allTransactions, reportMonth, config),
+    [allStudents, allTransactions, reportMonth, config]
   );
   const annualSummaries = useMemo(
     () => computeAcademicYearConduct(allStudents, allTransactions, config),

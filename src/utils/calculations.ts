@@ -1,7 +1,7 @@
-import { PointTransaction, GroupBonus, Student, ClassConfig } from '../types';
-import { getWeekDateRange } from './dateUtils';
+import { PointTransaction, GroupBonus, Student, ClassConfig, ConductThresholds } from '../types';
+import { getCurrentWeekAndMonth, getWeekDateRange, getWeekNumbersForMonth } from './dateUtils';
 
-export type ConductRank = 'Tốt' | 'Khá' | 'Đạt' | 'Chưa đạt';
+export type ConductRank = 'Tốt' | 'Khá' | 'Đạt' | 'Chưa đạt' | 'Chưa thiết lập';
 
 export interface ConductMonthResult {
   key: string;
@@ -34,17 +34,41 @@ export interface StudentAnnualConductSummary {
 }
 
 const CONDUCT_RANK_ORDER: Record<ConductRank, number> = {
+  'Chưa thiết lập': -1,
   'Chưa đạt': 0,
   'Đạt': 1,
   'Khá': 2,
   'Tốt': 3,
 };
 
-export function getConductRankFromPoints(totalPoints: number): ConductRank {
-  if (totalPoints >= 200) return 'Tốt';
-  if (totalPoints >= 100) return 'Khá';
-  if (totalPoints >= 51) return 'Đạt';
+export function normalizeConductThresholds(
+  thresholds?: Partial<ConductThresholds> | null
+): ConductThresholds | null {
+  if (!thresholds) return null;
+  const totMin = Number(thresholds.totMin);
+  const khaMin = Number(thresholds.khaMin);
+  const datMin = Number(thresholds.datMin);
+  if (![totMin, khaMin, datMin].every(Number.isFinite)) return null;
+  if (datMin < 0 || !(totMin > khaMin && khaMin > datMin)) return null;
+  return { totMin, khaMin, datMin };
+}
+
+export function getConductRankFromPoints(
+  totalPoints: number,
+  thresholds?: Partial<ConductThresholds> | null
+): ConductRank {
+  const configured = normalizeConductThresholds(thresholds);
+  if (!configured) return 'Chưa thiết lập';
+  if (totalPoints >= configured.totMin) return 'Tốt';
+  if (totalPoints >= configured.khaMin) return 'Khá';
+  if (totalPoints >= configured.datMin) return 'Đạt';
   return 'Chưa đạt';
+}
+
+export function formatConductThresholds(thresholds?: Partial<ConductThresholds> | null): string {
+  const configured = normalizeConductThresholds(thresholds);
+  if (!configured) return 'GVCN chưa cài đặt ngưỡng điểm xếp loại.';
+  return `Tốt (≥${configured.totMin}đ) • Khá (${configured.khaMin}–${configured.totMin - 1}đ) • Đạt (${configured.datMin}–${configured.khaMin - 1}đ) • Chưa đạt (<${configured.datMin}đ)`;
 }
 
 /**
@@ -54,6 +78,7 @@ export function getConductRankFromPoints(totalPoints: number): ConductRank {
  */
 export function suggestSemesterConduct(months: ConductMonthResult[]): ConductRank | null {
   if (months.length === 0) return null;
+  if (months.some((month) => month.rank === 'Chưa thiết lập')) return null;
   return months.reduce<ConductRank>((lowest, month) => (
     CONDUCT_RANK_ORDER[month.rank] < CONDUCT_RANK_ORDER[lowest] ? month.rank : lowest
   ), 'Tốt');
@@ -135,7 +160,7 @@ const buildSemesterResult = (
       key,
       ...period,
       totalPoints,
-      rank: getConductRankFromPoints(totalPoints),
+      rank: getConductRankFromPoints(totalPoints, config.conductThresholds),
     };
   });
 
@@ -188,6 +213,7 @@ export interface StudentScoreSummary {
   position: string;
   parentCode?: string;
   weekScores: { [week: number]: number };
+  monthWeekNumbers: number[];
   monthTotal: number;
   monthAverage: number;
   conductRank: ConductRank;
@@ -229,15 +255,37 @@ export function computeStudentScores(
   students: Student[] = [],
   transactions: PointTransaction[] = [],
   activeMonth: number = 9,
-  completedWeeksCount: number = 4
+  config?: ClassConfig,
+  completedWeeksCount?: number
 ): StudentScoreSummary[] {
   const safeStudents = students || [];
   const safeTransactions = transactions || [];
+  const configuredMonthWeeks = config
+    ? getWeekNumbersForMonth(config.week1StartDate, Number(config.totalWeeks) || 38, activeMonth)
+    : [];
+  const transactionMonthWeeks = Array.from(new Set(
+    safeTransactions
+      .filter((transaction) => Number(transaction.month) === Number(activeMonth))
+      .map((transaction) => Number(transaction.week))
+      .filter((week) => Number.isFinite(week) && week > 0)
+  )).sort((first, second) => first - second);
+  const monthWeekNumbers = configuredMonthWeeks.length > 0
+    ? configuredMonthWeeks
+    : transactionMonthWeeks;
+
+  let completedWeeks = completedWeeksCount;
+  if (completedWeeks === undefined && config && monthWeekNumbers.length > 0) {
+    const currentWeek = getCurrentWeekAndMonth(config.week1StartDate).currentWeek;
+    completedWeeks = monthWeekNumbers.filter((week) => week <= currentWeek).length;
+  }
 
   return safeStudents.map(student => {
-    const studentTxs = safeTransactions.filter(t => t.studentId === student.id && t.month === activeMonth);
+    const studentTxs = safeTransactions.filter(t => (
+      t.studentId === student.id && Number(t.month) === Number(activeMonth)
+    ));
 
-    const weekScores: { [week: number]: number } = { 1: 0, 2: 0, 3: 0, 4: 0 };
+    const weekScores: { [week: number]: number } = {};
+    monthWeekNumbers.forEach((week) => { weekScores[week] = 0; });
     let totalBonusPoints = 0;
     let totalMinusPoints = 0;
 
@@ -254,8 +302,9 @@ export function computeStudentScores(
 
     studentTxs.forEach(tx => {
       const pts = getSignedTransactionPoints(tx);
-      if (tx.week >= 1 && tx.week <= 4) {
-        weekScores[tx.week] = (weekScores[tx.week] || 0) + pts;
+      const transactionWeek = Number(tx.week);
+      if (Number.isFinite(transactionWeek) && transactionWeek > 0) {
+        weekScores[transactionWeek] = (weekScores[transactionWeek] || 0) + pts;
       }
 
       if (tx.type === 'plus') {
@@ -294,13 +343,19 @@ export function computeStudentScores(
       }
     });
 
-    const monthTotal = (weekScores[1] || 0) + (weekScores[2] || 0) + (weekScores[3] || 0) + (weekScores[4] || 0);
-    // Base average across 4 tracking weeks
-    const monthAverage = Math.round(monthTotal / 4);
+    // Tổng tháng phải lấy toàn bộ giao dịch của tháng. Không giới hạn tuần 1–4
+    // vì week là số tuần toàn năm (tháng sau có thể bắt đầu từ tuần 5, 6...).
+    const monthTotal = studentTxs.reduce(
+      (sum, transaction) => sum + getSignedTransactionPoints(transaction),
+      0
+    );
+    const monthAverage = Math.round(monthTotal / Math.max(1, monthWeekNumbers.length || transactionMonthWeeks.length || 1));
 
-    const conductRank = getConductRankFromPoints(monthTotal);
+    const conductRank = getConductRankFromPoints(monthTotal, config?.conductThresholds);
 
-    const isTemporary = completedWeeksCount < 4;
+    const isTemporary = monthWeekNumbers.length > 0
+      ? Number(completedWeeks ?? monthWeekNumbers.length) < monthWeekNumbers.length
+      : false;
 
     const disciplineFaults = 
       faultBreakdown.sleeping + 
@@ -318,6 +373,7 @@ export function computeStudentScores(
       position: student.position,
       parentCode: student.parentCode,
       weekScores,
+      monthWeekNumbers,
       monthTotal,
       monthAverage,
       conductRank,
@@ -357,31 +413,36 @@ export function computeGroupStandings(
   students: Student[] = [],
   transactions: PointTransaction[] = [],
   groupBonuses: GroupBonus[] = [],
-  activeMonth: number = 9
+  activeMonth: number = 9,
+  config?: ClassConfig
 ): GroupStanding[] {
-  const summaries = computeStudentScores(students || [], transactions || [], activeMonth);
+  const summaries = computeStudentScores(students || [], transactions || [], activeMonth, config);
   const bonusesList = groupBonuses || [];
+  const monthWeekNumbers = summaries[0]?.monthWeekNumbers || (
+    config ? getWeekNumbersForMonth(config.week1StartDate, Number(config.totalWeeks) || 38, activeMonth) : []
+  );
 
   const standings: GroupStanding[] = [1, 2, 3, 4].map(gNum => {
     const groupStudents = summaries.filter(s => s.groupNumber === gNum);
-    const bonuses = bonusesList.filter(b => b.month === activeMonth && b.groupNumber === gNum);
+    const bonuses = bonusesList.filter(b => Number(b.month) === Number(activeMonth) && b.groupNumber === gNum);
 
-    const weekScores: { [week: number]: number } = { 1: 0, 2: 0, 3: 0, 4: 0 };
+    const weekScores: { [week: number]: number } = {};
+    monthWeekNumbers.forEach((week) => { weekScores[week] = 0; });
     let memberPointsTotal = 0;
 
     groupStudents.forEach(st => {
-      for (let w = 1; w <= 4; w++) {
-        weekScores[w] = (weekScores[w] || 0) + (st.weekScores[w] || 0);
-      }
+      monthWeekNumbers.forEach((week) => {
+        weekScores[week] = (weekScores[week] || 0) + (st.weekScores[week] || 0);
+      });
       memberPointsTotal += st.monthTotal;
     });
 
     const bonusPointsTotal = bonuses.reduce((sum, b) => sum + (b.bonusPoints || 0), 0);
     const memberCount = groupStudents.length;
-    const weekAverages: { [week: number]: number } = { 1: 0, 2: 0, 3: 0, 4: 0 };
-    for (let w = 1; w <= 4; w++) {
-      weekAverages[w] = memberCount > 0 ? roundToOneDecimal(weekScores[w] / memberCount) : 0;
-    }
+    const weekAverages: { [week: number]: number } = {};
+    monthWeekNumbers.forEach((week) => {
+      weekAverages[week] = memberCount > 0 ? roundToOneDecimal(weekScores[week] / memberCount) : 0;
+    });
     const memberPointsAverage = memberCount > 0
       ? roundToOneDecimal(memberPointsTotal / memberCount)
       : 0;

@@ -357,7 +357,7 @@ export const CleaningDutyModule: React.FC<CleaningDutyModuleProps> = ({
 
         {/* Week Selector Chips */}
         <div className="flex items-center gap-2 overflow-x-auto pt-2 pb-1 scrollbar-none">
-          {Array.from({ length: Math.min(totalWeeks, 16) }, (_, i) => i + 1).map((w) => {
+          {Array.from({ length: totalWeeks }, (_, i) => i + 1).map((w) => {
             const isSelected = currentWeek === w;
             return (
               <button

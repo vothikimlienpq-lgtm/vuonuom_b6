@@ -14,6 +14,7 @@ interface ConductYearSummaryProps {
 }
 
 const rankClass: Record<ConductRank, string> = {
+  'Chưa thiết lập': 'bg-slate-100 text-slate-700 border-slate-300',
   'Tốt': 'bg-emerald-100 text-emerald-900 border-emerald-300',
   'Khá': 'bg-teal-100 text-teal-900 border-teal-300',
   'Đạt': 'bg-amber-100 text-amber-900 border-amber-300',
@@ -85,7 +86,7 @@ export const ConductYearSummary: React.FC<ConductYearSummaryProps> = ({
               Tổng hợp rèn luyện học kỳ & cả năm
             </h2>
             <p className="text-emerald-100 text-xs sm:text-sm mt-1.5 max-w-3xl leading-relaxed">
-              Học kỳ được gợi ý từ kết quả các tháng đã diễn ra. Kết quả cả năm được tính theo đúng tổ hợp HKI–HKII tại Điều 8; GVCN vẫn là người xem xét và xác nhận kết quả chính thức.
+              Học kỳ được gợi ý từ kết quả các tháng đã diễn ra theo ngưỡng điểm GVCN cài đặt. Kết quả cả năm được tính theo đúng tổ hợp HKI–HKII tại Điều 8; GVCN vẫn là người xem xét và xác nhận kết quả chính thức.
             </p>
           </div>
 

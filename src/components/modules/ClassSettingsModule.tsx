@@ -27,6 +27,7 @@ import {
 import { FullClassData, ClassConfig, PointRule, Student, UserRole } from '../../types';
 import { api } from '../../services/api';
 import { useToast } from '../Toast';
+import { normalizeConductThresholds } from '../../utils/calculations';
 
 interface ClassSettingsModuleProps {
   data: FullClassData;
@@ -76,6 +77,11 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
       province: data.config.province || '',
       totalWeeks: data.config.totalWeeks || 38,
       semester1Weeks: data.config.semester1Weeks || 18,
+      periodsPerDay: data.config.periodsPerDay || 8,
+      morningPeriods: data.config.morningPeriods || 5,
+      afternoonPeriods: data.config.afternoonPeriods ?? 3,
+      scheduleStructure: data.config.scheduleStructure || 'standard8',
+      conductThresholds: data.config.conductThresholds,
     });
   }, [data.config.id]);
 
@@ -175,18 +181,29 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
 
   const handleSaveConfig = async (e: React.FormEvent) => {
     e.preventDefault();
+    const conductThresholds = normalizeConductThresholds(config.conductThresholds);
+    if (!conductThresholds) {
+      warning('Vui lòng nhập đủ ba ngưỡng điểm và bảo đảm: Tốt > Khá > Đạt ≥ 0.');
+      return;
+    }
+    const periodsPerDay = Number(config.periodsPerDay) || 8;
+    const morningPeriods = Math.min(
+      periodsPerDay,
+      Math.max(1, Number(config.morningPeriods) || Math.min(periodsPerDay, 5))
+    );
     setSavingConfig(true);
     try {
       const res = await api.updateConfig({
         ...config,
-        periodsPerDay: Number(config.periodsPerDay) || 8,
+        periodsPerDay,
         totalWeeks: Number(config.totalWeeks) || 38,
         semester1Weeks: Math.min(
           Math.max(1, Number(config.semester1Weeks) || 18),
           Math.max(1, (Number(config.totalWeeks) || 38) - 1)
         ),
-        morningPeriods: Number(config.morningPeriods) || 5,
-        afternoonPeriods: (Number(config.periodsPerDay) || 8) > 5 ? (Number(config.periodsPerDay) || 8) - 5 : 0,
+        morningPeriods,
+        afternoonPeriods: Math.max(0, periodsPerDay - morningPeriods),
+        conductThresholds,
       });
       if (res.success) {
         success('Đã lưu cấu hình thông tin lớp, kế hoạch thời gian và thời khóa biểu thành công!');
@@ -702,7 +719,57 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
                 </div>
               </div>
 
-              {/* Section 3: Timetable & Homework Configuration */}
+              {/* Section 3: Teacher-defined conduct thresholds */}
+              <div className="space-y-4 pt-2">
+                <div className="flex items-center justify-between gap-3 pb-2 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <Flame className="w-5 h-5 text-emerald-800" />
+                    <h3 className="text-base font-black text-emerald-950">
+                      Quy Định Điểm Xếp Loại Rèn Luyện
+                    </h3>
+                  </div>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900">
+                    GVCN tự thiết lập
+                  </span>
+                </div>
+
+                <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-3 text-[11px] leading-relaxed text-amber-950">
+                  Hệ thống không dùng ngưỡng cố định. GVCN nhập điểm tối thiểu của từng mức; điểm thấp hơn mức Đạt sẽ được xếp Chưa đạt. Các ngưỡng này đồng bộ sang Tổng quan, Rèn luyện cá nhân, học kỳ, cả năm và phiếu in.
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {([
+                    ['totMin', 'Tốt từ (điểm)', 'Ví dụ: 200'],
+                    ['khaMin', 'Khá từ (điểm)', 'Ví dụ: 100'],
+                    ['datMin', 'Đạt từ (điểm)', 'Ví dụ: 51'],
+                  ] as const).map(([key, label, placeholder]) => (
+                    <div key={key}>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">{label}</label>
+                      <input
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={config.conductThresholds?.[key] ?? ''}
+                        onChange={(event) => setConfig({
+                          ...config,
+                          conductThresholds: {
+                            ...(config.conductThresholds || {}),
+                            [key]: event.target.value === '' ? undefined : Number(event.target.value),
+                          },
+                        })}
+                        placeholder={placeholder}
+                        required
+                        className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-black text-slate-900 bg-white"
+                      />
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  Điều kiện hợp lệ: <strong>điểm Tốt &gt; điểm Khá &gt; điểm Đạt ≥ 0</strong>.
+                </p>
+              </div>
+
+              {/* Section 4: Timetable & Homework Configuration */}
               <div className="space-y-4 pt-2">
                 <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                   <div className="flex items-center gap-2">
@@ -786,16 +853,30 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
                       Hoặc chọn số tiết cụ thể (1 – 10):
                     </label>
                     <select
-                      value={config.scheduleStructure === 'split10' ? 'split10' : String(config.periodsPerDay || 8)}
+                      value={config.scheduleStructure === 'split10'
+                        ? 'split10'
+                        : config.scheduleStructure === 'split7'
+                          ? 'split7'
+                          : String(config.periodsPerDay || 8)}
                       onChange={(e) => {
                         const isSplit10 = e.target.value === 'split10';
-                        const val = isSplit10 ? 10 : Number(e.target.value);
+                        const isSplit7 = e.target.value === 'split7';
+                        const val = isSplit10 ? 10 : isSplit7 ? 7 : Number(e.target.value);
+                        const morningPeriods = isSplit7 ? 4 : Math.min(val, 5);
                         setConfig({
                           ...config,
                           periodsPerDay: val,
-                          morningPeriods: Math.min(val, 5),
-                          afternoonPeriods: Math.max(0, val - 5),
-                          scheduleStructure: isSplit10 ? 'split10' : val === 8 ? 'standard8' : val === 5 ? 'standard5' : 'custom'
+                          morningPeriods,
+                          afternoonPeriods: Math.max(0, val - morningPeriods),
+                          scheduleStructure: isSplit10
+                            ? 'split10'
+                            : isSplit7
+                              ? 'split7'
+                              : val === 8
+                                ? 'standard8'
+                                : val === 5
+                                  ? 'standard5'
+                                  : 'custom'
                         });
                       }}
                       className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 bg-white"
@@ -804,6 +885,7 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
                       <option value={5}>5 tiết (Sáng: 1..5 - Chỉ buổi sáng)</option>
                       <option value={6}>6 tiết (Sáng: 1..5 + Chiều: 6)</option>
                       <option value={7}>7 tiết (Sáng: 1..5 + Chiều: 6, 7)</option>
+                      <option value="split7">7 tiết (Sáng: 1..4 + Chiều: 1..3)</option>
                       <option value={9}>9 tiết (Sáng: 1..5 + Chiều: 6..9)</option>
                       <option value={10}>10 tiết (Sáng: 1..5 + Chiều: 6..10 - Cả ngày)</option>
                       <option value="split10">10 tiết (Sáng: 1..5 + Chiều: 1..5 - Cả ngày)</option>
@@ -909,6 +991,8 @@ export const ClassSettingsModule: React.FC<ClassSettingsModuleProps> = ({
                   <div className="font-black text-emerald-800 mt-0.5">
                     {config.scheduleStructure === 'split10'
                       ? '10 tiết (Sáng 1–5 • Chiều 1–5)'
+                      : config.scheduleStructure === 'split7'
+                        ? '7 tiết (Sáng 1–4 • Chiều 1–3)'
                       : `${config.periodsPerDay || 8} tiết (${(config.periodsPerDay || 8) > 5 ? 'Sáng & Chiều' : 'Chỉ học sáng'})`}
                   </div>
                 </div>
